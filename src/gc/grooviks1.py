@@ -15,6 +15,8 @@ Instructions to run:
 import web
 import json
 import mimerender
+import re
+from string import maketrans
 
 mimerender = mimerender.WebPyMimeRender() 
 
@@ -38,12 +40,14 @@ def mr(target):
         return target(*args)
     return wrapped
 
+MOVE_PATTERN = "(?:[LRUDFB]w?|[MESlrudfbxyz])[123']?"
+
 # URL routing for the server
 urls = (
-    '/gc1/games(/)?', 'Games',
+    '/gc1/games(?:/)?', 'Games',
     '/gc1/games/(\d+)', 'Game',
     '/gc1/games/(\d+)/moves', 'Moves',
-    '/gc1/games/(\d+)/moves/(\d+)/([LRUDFBMESlrudfb][w]?[123\']?)', 'Moves',
+    '/gc1/games/(\d+)/moves/(\d+)/((?:%s)+)' % MOVE_PATTERN, 'Moves',
 )
 app = web.application(urls, globals())
 
@@ -97,11 +101,11 @@ class Games:
 
     """
     @mr
-    def GET(self, _):
+    def GET(self):
         return { RESULT: games().values() }
 
     @mr
-    def POST(self, _):
+    def POST(self):
         req = web.input()
         new_game = next_game()
 
@@ -150,16 +154,15 @@ class Game:
 class Moves:
     """List all of the moves made in game 1.
      GET /games/1/moves
-      => "R2U'BLF'UR"
+      => "R2u'blf'ur"
 
     Register move 34 in game 1:  turn the Right face 3 turns clockwise.
      PUT /games/1/moves/34/R3
+     PUT /games/1/moves?new=R3&pos=34
 
-    Register a new move, or possibly many moves.  If no context (previous moves) are supplied, this
-    always creates a new move (possibly breaking idempotency).
-     PUT /games/1/moves { current: "R'", preceding: "U2L'FB'RD" }
-     PUT /games/1/moves "U2L'FB'RDR'"
-     PUT /games/1/moves?new=R3&preceding=U2L3FB3RD
+    Register three moves (which need not all be new), starting at move 34:
+     PUT /games/1/moves/34/UL2x
+     PUT /games/1/moves?new=UL2x&pos=34
 
     Move notation grammar:
      move:
@@ -203,14 +206,33 @@ class Moves:
         return game(game_id)
 
     @mr
-    def PUT(self, game_id, move_index, move):
+    def PUT(self, game_id, move_index, new_moves):
         game_id = int(game_id)
         move_index = int(move_index)
-        moves = game(game_id).setdefault('moves', [])
-        while len(moves) < move_index:
-            moves.append("-")
-        moves[move_index - 1] = move
+        new_moves = new_moves.encode("ascii", "strict")
+        new_moves = re.findall(MOVE_PATTERN, new_moves)
+        self._record_moves(game_id, move_index, new_moves)
         return { RESULT: "" }
+
+    def _record_moves(self, game_id, move_index, new_moves):
+        """Add all of the specified moves to the game history at the given position, possibly
+        overwriting existing moves.  If the given position is beyond the range currently covered by
+        the game history, pad the missing moves.
+        
+        """
+        moves = game(game_id).setdefault('moves', [])
+        # If any moves have been skipped, pad the missing moves.
+        moves.extend(["-"] * (move_index - len(moves) - 1))
+        moves[move_index - 1:len(moves)] = [self._canonical_move(m) for m in new_moves]
+
+    def _canonical_move(self, move):
+        """Convert the move its canonical representation."""
+        move = move.translate(maketrans("3", "'"), "1")
+        match = re.match("([LRUDFB])w(.?)", move)
+        if match:
+            return match.group(1).lower() + match.group(2)
+        else:
+            return move
 
 #
 # GET /admin
