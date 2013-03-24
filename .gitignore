@@ -4,3 +4,7 @@
 # Backup files #
 *~
 #*#
+
+# Eclipse configuration #
+.project
+.pydevproject
