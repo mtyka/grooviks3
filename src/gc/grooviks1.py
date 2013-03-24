@@ -20,18 +20,19 @@ mimerender = mimerender.WebPyMimeRender()
 
 RESULT = 'result'
 
+HTML_TEMPLATE = "<html><body>%s</body></html>"
+
 render_xml = lambda **args: '<games>%s</games>' % ('<game>%s</game>' * len(args[RESULT])) % tuple(args[RESULT])
 render_json = lambda **args: json.dumps(args[RESULT])
-render_html = lambda message: '<html><body>%s</body></html>'%message
-render_txt = lambda message: message
+render_html = lambda **args: HTML_TEMPLATE % render_json(**args)
 
 def mr(target):
     @mimerender(
-                default = 'json',
+        default = 'json',
         html = render_html,
         xml  = render_xml,
         json = render_json,
-        txt  = render_txt,
+        txt  = render_json,
     )
     def wrapped(*args):
         return target(*args)
@@ -65,18 +66,18 @@ def game(game_id):
 #
 # TODO(david): see if we can find a more standard representation 
 _solved = { 'format': 'cross', 'repr': [ 
-	'   rrr   ',
-	'   rrr   ',
-	'   rrr   ',
-	'bbbwwwggg',
-	'bbbwwwggg',
-	'bbbwwwggg',
-	'   ooo   ',
-	'   ooo   ',
-	'   ooo   ',
-	'   yyy   ',
-	'   yyy   ',
-	'   yyy   ',
+    '   rrr   ',
+    '   rrr   ',
+    '   rrr   ',
+    'bbbwwwggg',
+    'bbbwwwggg',
+    'bbbwwwggg',
+    '   ooo   ',
+    '   ooo   ',
+    '   ooo   ',
+    '   yyy   ',
+    '   yyy   ',
+    '   yyy   ',
 ] }
 
 def next_game():
@@ -85,40 +86,48 @@ def next_game():
     _next_game_id += 1
     return { 'id': game_id, 'cube': _solved }
 
-#
-# GET /games
-# POST /games ?name=<name>
-#
 class Games:
+    """Show all my games:
+     GET /games
+
+    Create a new game (optionally, with the given name):
+     POST /games ?name=<name>
+
+    """
     @mr
     def GET(self, _):
         return { RESULT: games().values() }
-    
+
     @mr
     def POST(self, _):
         req = web.input()
         new_game = next_game()
-        
+
         if ('name' not in req):
             new_game['name'] = "Game %d" % new_game['id']
         else:
             new_game['name'] = req['name']
-        
+
         games()[new_game['id']] = new_game
         return { RESULT: new_game }
 
-#
-# GET /games/1 => { state: (ACTIVE|WAITING), hash: 0x140de050, cube: { format: cross, repr: [[...]] } }
-# PUT /games/1 { hash: 0x140de050, move: "R'" } # idempotent
-# PUT /games/1 { cube: { format: cross, repr: [[...]] } } # idempotent
-# DELETE /games/1
-#
 class Game:
+    """Print the details of game 1:
+     GET /games/1
+      => { state: (ACTIVE|WAITING), hash: 0x140de050, cube: { format: cross, repr: [[...]] } }
+
+    Update the state of game 1:
+     PUT /games/1 { cube: { format: cross, repr: [[...]] } }
+
+    Delete game 1:
+     DELETE /games/1
+
+    """
     @mr
     def GET(self, game_id):
         game_id = int(game_id)
         return { RESULT: game(int(game_id)) }
-    
+
     @mr
     def PUT(self, game_id):
         game_id = int(game_id)
@@ -129,7 +138,7 @@ class Game:
                 # TODO(david): validate that the new cube state is legal
                 game(game_id)['cube'] = req['cube']
         return { RESULT: game(int(game_id)) }
-    
+
     @mr
     def DELETE(self, game_id):
         game_id = int(game_id)
