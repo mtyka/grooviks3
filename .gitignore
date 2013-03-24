@@ -1,0 +1,6 @@
+# Compiled code #
+*.pyc
+
+# Backup files #
+*~
+#*#
