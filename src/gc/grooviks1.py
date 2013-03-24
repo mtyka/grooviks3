@@ -42,6 +42,8 @@ def mr(target):
 urls = (
     '/gc1/games(/)?', 'Games',
     '/gc1/games/(\d+)', 'Game',
+    '/gc1/games/(\d+)/moves', 'Moves',
+    '/gc1/games/(\d+)/moves/(\d+)/([LRUDFBMESlrudfb][w]?[123\']?)', 'Moves',
 )
 app = web.application(urls, globals())
 
@@ -84,7 +86,7 @@ def next_game():
     global _next_game_id
     game_id = _next_game_id
     _next_game_id += 1
-    return { 'id': game_id, 'cube': _solved }
+    return { 'id': game_id, 'cube': _solved, 'moves': [] }
 
 class Games:
     """Show all my games:
@@ -143,6 +145,72 @@ class Game:
     def DELETE(self, game_id):
         game_id = int(game_id)
         del games()[game_id]
+        return { RESULT: "" }
+
+class Moves:
+    """List all of the moves made in game 1.
+     GET /games/1/moves
+      => "R2U'BLF'UR"
+
+    Register move 34 in game 1:  turn the Right face 3 turns clockwise.
+     PUT /games/1/moves/34/R3
+
+    Register a new move, or possibly many moves.  If no context (previous moves) are supplied, this
+    always creates a new move (possibly breaking idempotency).
+     PUT /games/1/moves { current: "R'", preceding: "U2L'FB'RD" }
+     PUT /games/1/moves "U2L'FB'RDR'"
+     PUT /games/1/moves?new=R3&preceding=U2L3FB3RD
+
+    Move notation grammar:
+     move:
+      rotation [direction]
+      face [wide] [direction]
+
+     rotation:
+      "x" | "y" | "z"
+
+     face:
+      single_face
+      middle_face
+      double_face
+
+     single_face:
+      "L" | "R" | "U" | "D" | "F" | "B"
+
+     middle_face:
+      "M" | "E" | "S"
+
+     double_face:
+      "l" | "r" | "u" | "d" | "f" | "b"
+
+     wide:
+      "w"
+
+     # Includes the non-standard notation extensions "1" and "3"
+     direction:
+      "1" | "2" | "3" | "'"
+
+    """
+    @mimerender(
+        default = 'txt',
+        txt = lambda **args: " ".join(args['moves']),
+        json = lambda **args: json.dumps(args['moves']),
+        html = lambda **args: HTML_TEMPLATE % "".join(args['moves']),
+    )
+    def GET(self, game_id):
+        game_id = int(game_id)
+        game(game_id).setdefault('moves', [])
+        return game(game_id)
+
+    @mr
+    def PUT(self, game_id, move_index, move):
+        game_id = int(game_id)
+        move_index = int(move_index)
+        moves = game(game_id).setdefault('moves', [])
+        while len(moves) < move_index:
+            moves.append("-")
+        moves[move_index - 1] = move
+        return { RESULT: "" }
 
 #
 # GET /admin
