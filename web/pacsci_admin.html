@@ -1,0 +1,170 @@
+<html>
+<head>
+    <title>Pacsci Admin Page</title>
+    <style>
+        body {
+            background: black;
+            font-family: verdana, arial, sans-serif;
+            color: white;
+            font-size: 15px;
+        }
+
+        a {
+            color: #6666cc;
+        }
+
+        .container {
+            width: 500px;
+            margin: 0px auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin: 40px 0;
+            color: white;
+        }
+
+        b {
+            font-size: 19px;
+        }
+        #slider-group {
+            width: 70%;
+            margin: 0 auto;
+        }
+        .slidertext {
+            float: left;
+            margin: 30px;
+            color: white;
+            text-align: center;
+        }
+        .slider {
+            margin: 30px;
+        }
+    </style>
+    <script src="static/jquery.min.js"></script>
+    <script src="static/jquery-ui.min.js"></script>
+    <link rel="stylesheet" href="static/jquery-ui.css" type="text/css" media="all" />
+    <script type="text/javascript"> 
+
+    var max_slider = 100;
+    var clients_seen = []
+    // safe way to log things on webkit and not blow up firefox
+    function clog(msg) {
+        if( window.console ) {
+            console.log(msg);
+        }
+    }
+
+    function establish_hookbox_connections() {
+        if( !is_hookbox_loaded ) {
+            alert("Failed to connect to hookbox server.");
+        }
+
+        // create a connection object and setup the basic event callbacks.
+        hookbox_conn = hookbox.connect(server);
+        //hookbox_conn.onOpen = function() { alert("connection established!"); };
+        hookbox_conn.onError = function(err) { alert("Failed to connect to hookbox server: " + err.msg); };
+
+        subscription = null;
+        hookbox_conn.onSubscribed = function(channelName, _subscription) {
+            if( channelName == 'volumeControl' ) {
+                volume_subscription = _subscription;
+                volume_subscription.onPublish = function(frame) {
+                    // 0 is the client position, 1 is the client value
+                    if( frame.payload[0] == "pong" ){
+                        update_sliders(frame.payload[1], frame.payload[2]);
+                    }
+                }
+            }
+        };
+
+       // Subscribe to the pubsub channel with the colors
+       hookbox_conn.subscribe("volumeControl");
+    }
+        // load the hookbox library, or display an error
+        var is_hookbox_loaded = false;
+
+        // This code loads the hookbox.js from the current host but changing the port to 2974.
+        var server = location.protocol + '//' + location.hostname + ':2974';
+
+        // Dynamically inserts the code to load the script into the page.
+
+
+        function loadScript(sScriptSrc) {
+            var headelem = document.getElementsByTagName('head')[0];
+            var oScript = document.createElement('script');
+            oScript.type = 'text/javascript';
+            oScript.src = sScriptSrc;
+            oScript.onload = function() {
+                is_hookbox_loaded = true;
+                establish_hookbox_connections();
+                setInterval(hookbox_conn.publish("volumeControl", ["ping"] ), 5000);
+            }
+            oScript.onerror = function() {
+                alert("Could not load library from hookbox server.");
+            }
+            headelem.appendChild(oScript);
+        }
+        $(document).ready(function() {
+            loadScript( server + '/static/hookbox.js' );
+        });
+
+
+    function draw_slider(client_num, client_value) {
+        var m = '<div class="slidertext" id="slidertext' + client_num + '">Client ' + client_num + '<div class="slider" id="client' + client_num +'"></div></div>';
+        var pos = $.inArray(client_num, clients_seen);
+        if( clients_seen.length == 1 ) {
+            $('#slider-group').append(m);
+        } else if ( pos == 0 ) {
+            $(m).insertBefore('#slidertext'+clients_seen[pos+1]);
+        } else {
+            $(m).insertAfter('#slidertext'+clients_seen[pos-1]);
+        }
+        $( '#client'+client_num ).slider({
+            orientation: "vertical",
+            range: "min",
+            max: max_slider,
+            min: 0,
+            value: client_value,
+            slide: publish_volume,
+            change: publish_volume,
+        });
+    }
+
+    function publish_volume (event, ui) {
+        var outgoing = ["update"];
+        for(var i=0;i<=clients_seen[clients_seen.length-1];i++){
+            if( -1 != $.inArray(i.toString(), clients_seen)) {
+                outgoing.push($('#client'+i).slider("option","value"));
+            } else {
+                outgoing.push(0);
+            }
+        }
+        hookbox_conn.publish('volumeControl', outgoing );
+        outgoing = [];
+    }
+    function update_sliders(position, value) {
+        if ( clients_seen.length == 0 ) {
+            $( '#slider-group' ).html('');
+        }
+        if( $.inArray(position, clients_seen) == -1 ) {
+            clients_seen.push(position);
+            clients_seen.sort();
+            draw_slider(position, value);
+        } else {
+            $("#client"+position).slider("option", "value", value);
+        }
+    }
+    
+    </script>
+</head>
+<body>
+  <div class="volume">
+    <h1>Volume Control</h1>
+    <div id="slider-group">Waiting for clients to respond</div>
+  </div>
+    
+</body>
+</html>
+
+

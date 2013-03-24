@@ -1,0 +1,460 @@
+<html>   
+    <head>
+        <title>One cube to rule them all</title>
+        <script src="static/jquery.min.js"></script>
+        <script src="static/jquery-ui.min.js"></script>
+        <script src="static/jquery.svg.js"></script>
+        <script type="text/javascript" src="static/jquery.svganim.js"></script> 
+        <script type="text/javascript" src="static/jquery.svgdom.js"></script> 
+        <script type="text/javascript" src="static/jquery.svgfilter.js"></script> 
+        <script type="text/javascript" src="static/jquery.svggraph.js"></script> 
+        <script type="text/javascript" src="static/jquery.svgplot.js"></script> 
+
+
+	<link rel="stylesheet" href="static/jquery-ui.css" type="text/css" media="all" />
+	<link rel="stylesheet" href="static/ui.theme.css" type="text/css" media="all" />
+	<!-- <script src="static/jquery.bgiframe-2.1.2.js" type="text/javascript"></script> -->
+	
+
+
+<script type="text/javascript"> 
+function isIE()
+{
+  return /msie/i.test(navigator.userAgent) && !/opera/i.test(navigator.userAgent);
+}
+
+if( isIE() ) {
+    alert("Sorry, this site does not work in Internet Explorer.");
+}
+
+</script>
+	<script>
+	function hexFromRGB(r, g, b) {
+		var hex = [
+			r.toString( 16 ),
+			g.toString( 16 ),
+			b.toString( 16 )
+		];
+		$.each( hex, function( nr, val ) {
+			if ( val.length === 1 ) {
+				hex[ nr ] = "0" + val;
+			}
+		});
+		return hex.join( "" ).toUpperCase();
+	}
+	function refreshSwatch() {
+		var red = $( "#red" ).slider( "value" ),
+			green = $( "#green" ).slider( "value" ),
+			blue = $( "#blue" ).slider( "value" ),
+			hex = hexFromRGB( red, green, blue );
+		//  Add your code here $( "#swatch" ).css( "background-color", "#" + hex );
+		calibrateEvent();
+	}
+	$(function() {
+		$( "#red, #green, #blue" ).slider({
+			orientation: "horizontal",
+			range: "min",
+			max: max_slider,
+			value: max_slider,
+			slide: refreshSwatch,
+			change: refreshSwatch
+		});
+	});
+	</script>
+<script type="text/javascript"> 
+    // load the hookbox library, or display an error
+    var is_hookbox_loaded = false;
+
+    // This code loads the hookbox.js from the current host but changing the port to 2974.
+    var server = location.protocol + '//' + location.hostname + ':2974';
+
+    // Dynamically inserts the code to load the script into the page.
+
+
+    function loadScript(sScriptSrc) {
+        var headelem = document.getElementsByTagName('head')[0];
+        var oScript = document.createElement('script');
+        oScript.type = 'text/javascript';
+        oScript.src = sScriptSrc;
+        oScript.onload = function() {
+            is_hookbox_loaded = true;
+            establish_hookbox_connections();
+        }
+        oScript.onerror = function() {
+            alert("Could not load library from hookbox server.");
+        }
+        headelem.appendChild(oScript);
+    }
+    $(document).ready(function() {
+        loadScript( server + '/static/hookbox.js' );
+    });
+</script>
+<script type="text/javascript">
+
+function get_querystring_parameter(name) {
+    var match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+// ####################################################################
+// ######################## Configuration #############################
+// ####################################################################
+
+var HOW_LONG_STABLE_BEFORE_SHOWING_ARROWS = 700;  // ms
+
+var HOW_OFTEN_DISPLAY_FRAMERATE = 400;  // ms between updates
+var RENDER_WITH_CANVAS = true;
+
+/* SVG is an alternate way to render. It's not fully hooked up (no arrows, or input)
+but does offer smooth blending between frames using jquery.animate.
+It also renders vector-based when zooming on ipad/iphone although doesn't
+seem to offer real performance benefits on that platform.
+*/
+var RENDER_WITH_SVG = false;
+var SVG_ANIMATION_SPEED = 65;  // how many ms to blend color transitions over
+
+var position = get_querystring_parameter('position') || null;
+
+
+
+// ####################################################################
+// #################### Framerate calculation #########################
+// ####################################################################
+
+var frames_rendered=0;
+var frame_cnt_reset_at = (new Date()).getTime(); // epoch time in ms
+
+function display_framerate() {
+    var now = (new Date()).getTime();
+    var howlong_ms = now - frame_cnt_reset_at;
+    var fps = frames_rendered * 1000 / howlong_ms;
+    $('#framerate').html( Math.floor(fps*10) / 10 );
+
+    // reset
+    frames_rendered = 0;
+    frame_cnt_reset_at = now;
+}
+
+$(document).ready(function() {
+    setInterval( display_framerate, HOW_OFTEN_DISPLAY_FRAMERATE );
+});
+
+
+
+// ####################################################################
+// ###################### jquery helpers ##############################
+// ####################################################################
+
+
+jQuery.fn.elementlocation = function() {
+  var curleft = 0;
+  var curtop = 0;
+ 
+  var obj = this;
+ 
+  do {
+    curleft += obj.attr('offsetLeft');
+    curtop += obj.attr('offsetTop');
+ 
+    obj = obj.offsetParent();
+  } while ( obj.attr('tagName') != 'BODY' );
+ 
+ 
+  return ( {x:curleft, y:curtop} );
+};
+
+var client_state = "IDLE"
+{% include "admin_control.js" %}
+{% include "vector.js" %}
+{% include "admin_render.js" %}
+
+$(document).ready(function(){
+    $("#screensaver").click(  function(){ set_cubemode(3); } );
+    $("#pixelmapping").click(  function(){ set_cubemode(2); } );
+    $("#colorcalibration").click(     function(){ set_cubemode(1); } );
+    $("#normal").click(     function(){ set_cubemode(0); } );
+    $("#blankpixel").click(     function(){ map_blank_pixel(); } );
+
+    if (!position) {
+        $("#buttonleft").click( function(){ 
+           animate_spin( -Math.PI*2/3 );
+        });
+        $("#buttonright").click( function(){ 
+           animate_spin( Math.PI*2/3 );
+        });
+    } else {
+        $("#buttonleft, #buttonright").css('visibility', 'hidden');
+
+        // using -Math.PI*2/3 for the rotation angle gives a funny angle when rendered - I suspect there is a bug in render.js
+        var start_azimuth = parseInt([ -Math.PI*2/3.1, 0, Math.PI*2/3.1 ][position-1] * 100);
+        clog('start azi: ' + start_azimuth);
+        $("#slide_azi").val(  start_azimuth );
+        rotate_view(); 
+    }
+
+    $("#calibration-sliders").hide();
+    $("#blankpixel").hide();
+    set_cubemode(0);
+
+});
+
+
+var locked_buttons=false;
+
+function animate_spin(delta_radians) {
+		// lock the buttons
+		if(locked_buttons) return;
+		locked_buttons = true;
+		
+
+		// do the boogie 
+		var azimuth = $("#slide_azi").val()*1.0; // convert from string to number. javascript sucks
+		azimuth = azimuth % (100*Math.PI*2);  // Re-center
+		$("#slide_azi").attr("animate_val", azimuth); // prep temporary animation variable
+		azimuth += delta_radians*100;
+		//console.log(azimuth);
+		$("#slide_azi").animate( { 
+			animate_val: azimuth 
+		},{ duration: 2000, 
+		    complete: function(){
+					locked_buttons = false;
+				},
+				step: function() {  
+					//console.log($("#slide_azi").attr("animate_val") ); 
+					$("#slide_azi").val( $("#slide_azi").attr("animate_val") );
+					rotate_view(); 
+		    }     
+      }
+		);
+}
+
+
+
+</script>   
+<style>
+	#red, #green, #blue {
+		width: 200px;
+		margin: 15px;
+	}
+
+	#red .ui-slider-range { background: #ef2929; }
+	#red .ui-slider-handle { border-color: #ef2929; }
+	#green .ui-slider-range { background: #8ae234; }
+	#green .ui-slider-handle { border-color: #8ae234; }
+	#blue .ui-slider-range { background: #729fcf; }
+	#blue .ui-slider-handle { border-color: #729fcf; }
+    #calibration-sliders {
+        position:relative;
+        top:-600px;
+    }
+    #facenum {
+        text-align:left;
+        position: absolute;
+        left:15px;
+        top:-30px;
+        font-size:12px;
+    }
+    .debug {
+        display:none;
+    }
+
+    body {
+        font-family: verdana, sans-serif;
+        background: black;
+        color: #ffffdd;
+        overflow: hidden;
+		}
+
+    h1 {
+        text-shadow: 0px 0px 5px #ff8888; 
+    }
+
+    #container {
+      text-align: center;
+			margin: 0px auto;
+		}
+
+		.toprow{
+			margin-left: auto;
+			margin-right: auto;
+			width: 1000px;
+			position: relative;
+			top: 0px;
+		}
+		.bottomrow{
+			clear: both;
+			margin-left: auto;
+			margin-right: auto;
+			top: -285px;
+			position: relative;
+			width: 600px;
+		}
+        #blankpixel {
+            position:relative;
+            top: -550px;
+            left: -400px;
+        }
+    .button {
+ 			margin-left:  4px;
+			margin-right:  4px;
+			z-index: 3;
+       }
+		.button.left{ float:left; }
+		.button.right{ float:right; }
+		.clear{ clear: both; }
+
+		#canvas{
+			width: 750px;
+			height: 750px;
+			position: relative;
+			top: -140px;
+			z-index:   -1;	
+		}
+
+		#manual_rotate {
+			position: relative;
+			top: -400px;
+		}
+        #screensaver {
+            width: 200px;
+            height: auto;
+        }
+        .bigbutton {
+            vertical-align:middle;
+        }
+
+</style>
+<!--
+position: absolute; left: 610px; top: 80px;
+
+
+style="float:left; left:  350px; top: 90px;"  
+style="float:left; left:  540px; top: 90px;"  
+style=" left:  730px; top: 90px;"             
+style=" left:  920px; top: 90px;"             
+style=" left: 1110px; top: 90px;"             
+style=" left:  425px; top: 650px;"            
+style=" left: 1110px; top: 650px;"            
+
+
+       <h1 class="pulse">One cube to rule them all</h1>
+
+p
+			width: 100px;
+-->
+
+	</head>
+    <body>
+    <div id="container">
+      {% block top %}
+            <div class="toprow" >
+                <img class="bigbutton"   id="screensaver"      src="/static/animated_disco.gif"  alt="Screen Saver"  >
+                <img class="bigbutton"   id="pixelmapping"      src="/static/button_pixelmap.png"  alt="Pixel Mapping"  >
+                <img class="bigbutton"   id="colorcalibration"     src="/static/button_colorcalib.png" alt="Color Calibration" >
+                <img class="bigbutton"   id="normal"     src="/static/button_normalmode.png" alt="Normal Mode" >
+            </div>
+
+      {% endblock %}
+
+			<div id="svgholder"></div>
+	
+           <canvas id="canvas" width=750 height=750></canvas>   
+
+
+            <div class="bottomrow" >
+                <img class="button left"   id="buttonleft"  src="/static/button_left.png"      alt="Left"  >
+                <img class="button right"   id="buttonright" src="/static/button_right.png"     alt="Right" >
+            </div>
+            <div id="calibration-sliders">
+                <div id="facenum">No face being calibrated now.</div>
+                <div id="red"></div>
+                <div id="green"></div>
+                <div id="blue"></div>
+            </div>
+            <div id="pixelholder">
+                <img class="blankpixel"   id="blankpixel"  src="/static/blankpixel.png"      alt="blank"  >
+            </div>
+        {% block bottom %}
+        {% endblock %}
+      </div>
+
+
+
+       <div id="cube_status">Waiting for controller...</div>
+
+       <div id="manual_rotate" class="debug">
+          Altitude: <input id="slide_alt" type="range" min="-1000" max="1000" value="220" onchange="rotate_view();"><br/>
+          Azimuth: <input id="slide_azi" type="range" min="-1000" max="1000" value="0" onchange="rotate_view();"><br/>
+       </div>
+       <div id="frameratediv" class="debug">
+       Framerate: <span id="framerate">...</span> fps
+       </div>
+
+   <script>
+
+     // Display debug stuff if URL snippet is #debug
+     $(document).ready( function() {
+        if( location.hash == "#debug" ) {
+            $(".debug").css('display','block');
+        }
+     });
+    
+    // Show SVG element if configured.
+    var svg;
+    if( RENDER_WITH_SVG ) {
+        $(document).ready( function() {
+            $('#svgholder').append('<h4>svg</h4><div id="svgdiv" style="width:300px; height:300px; background: black;"> </div>');
+            $('#svgdiv').svg({onLoad: store_svg_obj});
+        });
+    }
+    function store_svg_obj(new_svg) { 
+        svg = new_svg;
+    }
+
+    // Pulse the color of the header
+    function fade_to_red() {
+        $('.pulse').animate(
+          { 'color': '#f88' },
+          40000, 'linear', fade_to_yellow
+        );
+    }
+    function fade_to_yellow() {
+        $('.pulse').animate(
+          { 'color': '#ffd' },
+          40000, 'linear',fade_to_red
+        );
+    }
+    $(document).ready( function() {
+        fade_to_red();
+    });
+
+</script>
+    </div>
+
+<script type="text/javascript">
+
+// Only include GA if we're on port 80, i.e. production
+if( ! document.location.port ) {
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-16219925-1']);
+  _gaq.push(['_setDomainName', 'none']);
+  _gaq.push(['_setAllowLinker', true]);
+  _gaq.push(['_trackPageview']);
+
+  (function() {
+    var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+    ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+  })();
+}
+
+</script>
+    </script>
+
+
+
+
+
+    </body> 
+</html>  
+
+

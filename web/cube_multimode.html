@@ -1,0 +1,1016 @@
+<html>   
+    <head>
+        <title>One cube to rule them all</title>
+        <link rel="stylesheet" type="text/css" href="/static/cube_style.css" />
+				<script src="/static/jquery.min.js"></script>
+        <script src="/static/jquery-ui.min.js"></script>
+        <script src="/static/jquery.svg.js"></script>
+        <script type="text/javascript" src="/static/jquery.svganim.js"></script> 
+        <script type="text/javascript" src="/static/jquery.svgdom.js"></script> 
+        <script type="text/javascript" src="/static/jquery.svgfilter.js"></script> 
+        <script type="text/javascript" src="/static/jquery.svggraph.js"></script> 
+        <script type="text/javascript" src="/static/jquery.svgplot.js"></script> 
+
+
+<script type="text/javascript"> 
+function isIE()
+{
+  return /msie/i.test(navigator.userAgent) && !/opera/i.test(navigator.userAgent);
+}
+
+if( isIE() ) {
+    alert("Sorry, this site does not work in Internet Explorer.");
+}
+
+</script>
+
+<script> 
+
+//////////// FLASH DISPLAY ////////////////////////////////////////////
+
+function flash_display( text ){
+	flash_display( test, 3000 );
+}
+
+function flash_display( text, uptime ){
+	$("#movestext").css("opacity", "0.0"); 
+	$("#movestext").html( text );
+	$("#movestext").animate( {
+		opacity:1.0
+	},{ duration: 1000 }
+	);
+	setTimeout( "remove_flash_display()", uptime )
+}
+
+function remove_flash_display(){
+	$("#movestext").animate( {
+		opacity:0.0
+	},{ duration: 1000,
+	    complete: function() { $("#movestext").html(""); } }
+	);
+	
+}
+
+</script>
+
+
+<script>
+
+///////////// HOW MANY MOVES FROM SOLVED - DISPLAY ////////////////////
+var last_moves_from_solved = 0
+var moves_from_solved = 0
+var next_flash_moves_display;
+function flash_moves_display(){
+	// exclude when not to flash moves display
+	if ( client_state != "MULT" && client_state != "SING" ) return; 
+	if ( client_state == "SING" && ( active_position != position) ) return; 
+	if( moves_from_solved  <= 0 ) return;
+	if( moves_from_solved > 5 ) return;
+	if( (moves_from_solved > last_moves_from_solved) && 
+	    ( moves_from_solved >  -1 ) &&
+			( last_moves_from_solved > -1 )
+	){
+		if( moves_from_solved == 1 ) flash_display("Hey! It was so pristine - now you've messed it up!" );
+		if( moves_from_solved == 2 ) flash_display("Looks like that was wrong. You're now " + moves_from_solved + " moves away from solved!");	
+		if( moves_from_solved == 3 ) flash_display("Hmmm.. 3 moves from solved");
+		if( moves_from_solved == 4 ) flash_display("Wrong direction - you're now 4 moves away from solved.");
+		if( moves_from_solved == 5 ) flash_display("Believe it or not - You're now " + moves_from_solved + " moves from solved!");	
+	}
+	else if ( moves_from_solved == last_moves_from_solved ){
+		flash_display("You're just " + moves_from_solved + " moves from solved!"); 
+	}else{
+		if( moves_from_solved == 1 ) flash_display("Just one more move !" );
+		if( moves_from_solved == 2 ) flash_display("So close! Just " + moves_from_solved + " moves from solved!");	
+		if( moves_from_solved == 3 ) flash_display("Nice! Only " + moves_from_solved + " moves from solved!");	
+		if( moves_from_solved == 4 ) flash_display("Ok, you're getting close now - you're " + moves_from_solved + " moves from solved!");	
+		if( moves_from_solved == 5 ) flash_display("Believe it or not - You're merely " + moves_from_solved + " moves from solved!");	
+	}
+	last_moves_from_solved = moves_from_solved;
+}
+
+function reset_flash_moves_timeout(){
+	clog( "Clear Flash Moves Timeout" );
+	clearTimeout( next_flash_moves_display )
+	$("#movestext").html("");	
+}
+
+
+$(window).click( function() {
+	reset_flash_moves_timeout();
+	reset_timeout();
+	//touch screen to begin!
+	if( menustate == 1 ){
+		clicked_wake();
+	}
+} )
+
+</script>
+
+
+
+
+
+
+
+<script type="text/javascript"> 
+    // load the hookbox library, or display an error
+    var is_hookbox_loaded = false;
+
+    // This code loads the hookbox.js from the current host but changing the port to 2974.
+    var server = location.protocol + '//' + location.hostname + ':2974';
+
+    // Dynamically inserts the code to load the script into the page.
+
+
+    function loadScript(sScriptSrc) {
+        var headelem = document.getElementsByTagName('head')[0];
+        var oScript = document.createElement('script');
+        oScript.type = 'text/javascript';
+        oScript.src = sScriptSrc;
+        oScript.onload = function() {
+            is_hookbox_loaded = true;
+            establish_hookbox_connections();
+        }
+        oScript.onerror = function() {
+            alert("Could not load library from hookbox server.");
+        }
+        headelem.appendChild(oScript);
+    }
+    $(document).ready(function() {
+        loadScript( server + '/static/hookbox.js' );
+    });
+</script>
+<script type="text/javascript">
+
+function get_querystring_parameter(name) {
+    var match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+// ####################################################################
+// ######################## Configuration #############################
+// ####################################################################
+
+var HOW_LONG_STABLE_BEFORE_SHOWING_ARROWS = 700;  // ms
+
+var HOW_OFTEN_DISPLAY_FRAMERATE = 400;  // ms between updates
+var RENDER_WITH_CANVAS = true;
+
+/* SVG is an alternate way to render. It's not fully hooked up (no arrows, or input)
+but does offer smooth blending between frames using jquery.animate.
+It also renders vector-based when zooming on ipad/iphone although doesn't
+seem to offer real performance benefits on that platform.
+*/
+var RENDER_WITH_SVG = false;
+var SVG_ANIMATION_SPEED = 65;  // how many ms to blend color transitions over
+
+var position = get_querystring_parameter('position') || null;
+var grey = get_querystring_parameter('grey') || 0;
+
+
+
+// ####################################################################
+// #################### Framerate calculation #########################
+// ####################################################################
+
+var frames_rendered=0;
+var frame_cnt_reset_at = (new Date()).getTime(); // epoch time in ms
+
+function display_framerate() {
+    var now = (new Date()).getTime();
+    var howlong_ms = now - frame_cnt_reset_at;
+    var fps = frames_rendered * 1000 / howlong_ms;
+    $('#framerate').html( Math.floor(fps*10) / 10 );
+
+    // reset
+    frames_rendered = 0;
+    frame_cnt_reset_at = now;
+}
+
+$(document).ready(function() {
+    setInterval( display_framerate, HOW_OFTEN_DISPLAY_FRAMERATE );
+});
+
+
+
+// ####################################################################
+// ###################### jquery helpers ##############################
+// ####################################################################
+
+
+jQuery.fn.elementlocation = function() {
+  var curleft = 0;
+  var curtop = 0;
+ 
+  var obj = this;
+ 
+  do {
+    curleft += obj.attr('offsetLeft');
+    curtop += obj.attr('offsetTop');
+ 
+    obj = obj.offsetParent();
+  } while ( obj.attr('tagName') != 'BODY' );
+ 
+ 
+  return ( {x:curleft, y:curtop} );
+};
+
+{% include "control.js" %}
+{% include "vector.js" %}
+{% include "render.js" %}
+
+
+
+
+// GAME TIMOUT COUNTER & LOGIC 
+
+function clear_game_timeout(){
+	game_timeout = -2;
+	$("#game_timeout").css("display", "none" );
+}
+
+function count_down_game_timeout(){
+	if( game_timeout > -2 ) game_timeout -= 1;
+	
+	// timeout has occured!
+	if( game_timeout == -1 ){
+		game_timeout_occured();
+	}
+	if( game_timeout < 0 ) $("#game_timeout").css("display", "none" )
+	else                   $("#game_timeout").css("display", "inline" )
+	$("#game_timeout").html( game_timeout );
+	
+	setTimeout( "count_down_game_timeout()", 1000 );
+}
+var game_timeout_display = $( jQuery( '<div class="game_timeout"> <h1 id="game_timeout" >Timeout</h1> </div>' ) )
+$( document ).ready( function(){
+		$( "body" ).append( game_timeout_display )
+		count_down_game_timeout(); 
+} );
+
+
+
+function set_initial_position(){
+			// using -Math.PI*2/3 for the rotation angle gives a funny angle when rendered - I suspect there is a bug in render.js
+      var start_azimuth = parseInt([ -Math.PI*2/3.1, 0, Math.PI*2/3.1 ][position-1] * 100);
+        //clog('start azi: ' + start_azimuth);
+        //$("#slide_azi").val(  start_azimuth );
+        //rotate_view(); 
+      clog("Resetting proper position: " + position + "  (" + start_azimuth + ")" );
+			stop_spin();
+			animate_absolute_spin( start_azimuth ) 
+}
+
+var selected_game_mode = "START_3P"
+
+function select_difficulty( difficulty ){
+
+	last_moves_from_solved = difficulty
+	moves_from_solved = difficulty
+	next_flash_moves_display = setTimeout("flash_moves_display()", 5000 ); 
+
+	clog("ClientSentGameMode: " + selected_game_mode );
+	hookbox_conn.publish('clientcommand', {'position' : position, 'command' : selected_game_mode } );
+  reset_gamestate(position, difficulty ); 
+}
+
+
+$(document).ready(function(){
+    $("#easy").click(   function() { select_difficulty(2);  } );
+    $("#medium").click( function() { select_difficulty(3);  } );
+    $("#hard").click(   function() { select_difficulty(4);  } );
+    $("#master").click( function() { select_difficulty(5);  } );
+    $("#full").click(   function() { select_difficulty(20); } );
+
+//    //if (!position) {
+//        $("#buttonleft").click( function(){ 
+//           animate_spin( -Math.PI*2/3 );
+//        });
+//        $("#buttonright").click( function(){ 
+//           animate_spin( Math.PI*2/3 );
+//        });
+//    } else {
+        $("#buttonleft, #buttonright").css('visibility', 'hidden');
+
+//    }
+
+		set_initial_position();
+
+});
+
+
+
+function animate_absolute_spin(radians) {
+		// do the boogie 
+		var azimuth = $("#slide_azi").val()*1.0; // convert from string to number. javascript sucks
+		azimuth = azimuth % (100*Math.PI*2);  // Re-center
+		$("#slide_azi").attr("animate_val", azimuth); // prep temporary animation variable
+	
+    clog("Animate_absolute_spin: " + azimuth + "    " + radians);
+		if( azimuth == radians ){
+			// we're already at solved position
+			clog("Already at solved position");
+			return;
+		}
+		
+		locked_buttons = true;
+    ignore_clicks = true;
+		azimuth = radians 
+		$("#slide_azi").animate( { 
+			animate_val: azimuth 
+		},{ duration: 2000, 
+		    complete: function(){
+					locked_buttons = false;
+					ignore_clicks = false;
+					update_view();
+				},
+				step: function() {  
+					//console.log($("#slide_azi").attr("animate_val") ); 
+					$("#slide_azi").val( $("#slide_azi").attr("animate_val") );
+					rotate_view(); 
+		    }     
+      }
+		);
+}
+
+
+function animate_spin(delta_radians) {
+		// lock the buttons
+		if(locked_buttons) return;
+		locked_buttons = true;
+		ignore_clicks = true;
+		
+
+		// do the boogie 
+		var azimuth = $("#slide_azi").val()*1.0; // convert from string to number. javascript sucks
+		azimuth = azimuth % (100*Math.PI*2);  // Re-center
+		$("#slide_azi").attr("animate_val", azimuth); // prep temporary animation variable
+		azimuth += delta_radians*100;
+		//console.log(azimuth);
+		$("#slide_azi").animate( { 
+			animate_val: azimuth 
+		},{ duration: 2000, 
+		    complete: function(){
+					locked_buttons = false;
+					ignore_clicks = false;
+				},
+				step: function() {  
+					//console.log($("#slide_azi").attr("animate_val") ); 
+					$("#slide_azi").val( $("#slide_azi").attr("animate_val") );
+					rotate_view(); 
+		    }     
+      }
+		);
+}
+
+
+var is_spinning = false;
+function start_spin( start_spin ){
+		
+		// dont spin if there's no menu.
+		if( menustate == 0 ) return;
+
+		if( start_spin ){
+			if( is_spinning ) return; // cube is already spinning - dont start another thread.
+			// otherwise set the state variable and go!
+			is_spinning = true;	
+	  }
+
+		if( !is_spinning ){
+			return;
+		}
+
+		var azimuth = $("#slide_azi").val()*1.0; // convert from string to number. javascript sucks
+		azimuth += 1 ;
+		azimuth = azimuth % (100*Math.PI*2);  // Re-center
+		$("#slide_azi").val( azimuth  ); 
+		rotate_view();
+		setTimeout("start_spin( false )",25 ) 
+}
+
+function stop_spin(){
+		is_spinning = false;
+}
+
+
+</script>   
+
+
+
+<script>
+
+var timeout_length = 40; 
+var inactivity_timeout = -1; // off by default 
+
+function reset_timeout(){
+	if ( menustate != 4 ) inactivity_timeout = timeout_length;
+}
+
+function update_timeout( ){
+	if( inactivity_timeout == 10 ){ 
+		//Only show timeout menu when we're not already in some menu
+		if( menustate == 0 ) goto_timeout_screen(); 
+	}
+	
+	document.title = inactivity_timeout 
+	// Fulltimeout
+	if( inactivity_timeout == 0 ){ clicked_quit(); } 
+	$("#timeout_display").html( inactivity_timeout );
+	if( inactivity_timeout > -2 ) inactivity_timeout-=1;
+	setTimeout("update_timeout()",1000) // call me again in 1000 ms
+}
+
+function clicked_continue(){
+	reset_timeout();	
+	clear_screen(); 
+}
+
+
+</script>
+
+
+
+
+<script>
+
+
+
+function flyin_menu_bg(){
+		// background is in place - thus ignore clicks on canvas
+		ignore_clicks=true;
+		
+		// animate all the opacities and positions to bring in the background of the menu
+		$("#levelmenu_bg").css("opacity", "-2.0"); 
+		$("#levelmenu_bg").css("left", "0"); 
+		$("#levelmenu_bgb").css("opacity", "-2.0"); 
+		$("#levelmenu_bgt").css("opacity", "-2.0"); 
+		
+		$("#levelmenu_bgb").animate( {
+			opacity:1.0
+		},{ duration: 1000 }
+		);
+		$("#levelmenu_bgt").animate( {
+			opacity:1.0
+		},{ duration: 1000 }
+		);
+		$("#levelmenu_bg").animate( {
+			opacity:0.6
+		},{ duration: 1000 }
+		);
+
+		$("#button_restart").animate( {
+			opacity:0.0
+		},{ duration: 1000 }
+		);
+
+}
+
+function flyout_menu_bg(){
+		$("#levelmenu_bgb").animate( {
+			opacity:-1.0
+		},{ duration: 1000 }
+		);
+		$("#levelmenu_bgt").animate( {
+			opacity:-1.0
+		},{ duration: 1000 }
+		);
+		$("#levelmenu_bg").animate( {
+			opacity:-1.0
+		},{ duration: 1000,
+		    complete: function(){   $("#levelmenu_bg").css("left", "-100%") }   }
+		);
+		$("#button_restart").animate( {
+			opacity:1.0
+		},{ duration: 1000 }
+		);
+}
+
+function flyin_idlemenu() {
+		$("#idlemenu").css("left", "-25%"); 
+		$("#idlemenu").animate( {
+		  left: "50%",	
+		},{ duration: 1000 }
+		);
+
+		$("#button_quit").animate( {
+			opacity:0.0
+		},{ duration: 1000 }
+		);
+
+}
+
+function flyout_idlemenu() {
+		$("#idlemenu").animate( {
+		  left: "125%"	
+		},{ duration: 1000,
+		    complete: function(){ $("#idlemenu").css("left", "-25%");  } 
+		  }
+		);
+		$("#button_quit").animate( {
+			opacity:1.0
+		},{ duration: 1000 }
+		);
+
+}
+
+function flyin_modemenu() {
+		$("#modemenu").css("left", "-25%"); 
+		$("#modemenu").animate( {
+		  left: "50%",	
+		},{ duration: 1000 }
+		);
+}
+
+function flyout_modemenu() {
+		$("#modemenu").animate( {
+		  left: "125%"	
+		},{ duration: 1000,
+		    complete: function(){ $("#modemenu").css("left", "-25%");  } 
+		  }
+		);
+
+}
+
+function flyin_levelmenu() {
+		$("#levelmenu").css("left", "-25%"); 
+		$("#levelmenu").animate( {
+		  left: "50%",	
+		},{ duration: 1000 }
+		);
+}
+
+function flyout_levelmenu() {
+		$("#levelmenu").animate( {
+		  left: "125%"	
+		},{ duration: 1000, 
+		    complete: function(){ $("#levelmenu").css("left", "-25%");  } 
+		}
+		);
+}
+
+
+function flyin_timeoutmenu() {
+		$("#timeoutmenu").css("left", "-25%"); 
+		$("#timeoutmenu").animate( {
+		  left: "50%",	
+		},{ duration: 1000 }
+		);
+		// start the timeout!
+		reset_timeout();
+}
+
+function flyout_timeoutmenu() {
+		$("#timeoutmenu").animate( {
+		  left: "125%"	
+		},{ duration: 1000 }
+		);
+    // also turn off timer
+	  inactivity_timeout = -1; // 
+}
+
+
+function flyin_joinmenu() {
+		$("#joinmenu").css("left", "-25%"); 
+		$("#joinmenu").animate( {
+		  left: "50%",	
+		},{ duration: 1000 }
+		);
+}
+	
+
+function flyout_joinmenu() {
+		$("#joinmenu").animate( {
+		  left: "125%"	
+		},{ duration: 1000, 
+		    complete: function(){ $("#joinmenu").css("left", "-25%");  } 
+		}
+		);
+}
+
+
+
+function flyin_queuedmenu() {
+		$("#queuedmenu").css("left", "-25%"); 
+		$("#queuedmenu").animate( {
+		  left: "50%",	
+		},{ duration: 1000 }
+		);
+}
+
+function flyout_queuedmenu() {
+		$("#queuedmenu").animate( {
+		  left: "125%"	
+		},{ duration: 1000, 
+		    complete: function(){ $("#queuedmenu").css("left", "-25%");  } 
+		}
+		);
+}
+
+
+function flyin_waitingmenu() {
+		$("#waitingmenu").css("left", "-25%"); 
+		$("#waitingmenu").animate( {
+		  left: "50%",	
+		},{ duration: 1000 }
+		);
+}
+
+function flyout_waitingmenu() {
+		$("#waitingmenu").animate( {
+		  left: "125%"	
+		},{ duration: 1000, 
+		    complete: function(){ $("#waitingmenu").css("left", "-25%");  } 
+		}
+		);
+}
+
+function flyin_connectingmenu() {
+		$("#connectingmenu").css("left", "-25%"); 
+		$("#connectingmenu").animate( {
+		  left: "50%",	
+		},{ duration: 1000 }
+		);
+}
+
+function flyout_connectingmenu() {
+		$("#connectingmenu").animate( {
+		  left: "125%"	
+		},{ duration: 1000, 
+		    complete: function(){ $("#connectingmenu").css("left", "-25%");  } 
+		}
+		);
+}
+
+
+function goto_idle_screen(){
+    ignore_clicks = true;
+   	if( menustate == 1 ) return;
+		remove_menu();
+		if( menustate == 0 ) flyin_menu_bg();        
+   	menustate = 1 
+		flyin_idlemenu();
+
+		interrupt_ok = true;
+
+		clog("setting client state to home-restart");
+		start_spin( true );
+}
+
+function goto_mode_screen(){
+    ignore_clicks = true;
+   	if( menustate == 2 ) return;
+		remove_menu();
+		if( menustate == 0 ) flyin_menu_bg();        
+   	menustate = 2 
+		flyin_modemenu();
+
+		interrupt_ok = true;
+		start_spin( true );
+}
+
+function goto_level_screen(){
+    ignore_clicks = true;
+   	if( menustate == 3 ) return;
+		remove_menu();
+		if( menustate == 0 ) flyin_menu_bg();        
+   	menustate = 3 
+		flyin_levelmenu();        
+		start_spin( true );
+}
+
+function goto_timeout_screen(){
+    ignore_clicks = true;
+   	if( menustate == 4 ) return;
+		remove_menu();
+		if( menustate == 0 ) flyin_menu_bg();        
+   	menustate = 4 
+		flyin_timeoutmenu();        
+		start_spin( true );
+}
+
+function goto_join_screen(){
+    ignore_clicks = true;
+   	if( menustate == 5 ) return;
+		if( interrupt_ok ){
+			remove_menu();
+			if( menustate == 0 ) flyin_menu_bg();        
+			menustate = 5 
+			flyin_joinmenu();  
+		}
+		start_spin( true );
+}
+
+function goto_queued_screen(){
+    ignore_clicks = true;
+   	if( menustate == 6 ) return;
+		remove_menu();
+		if( menustate == 0 ) flyin_menu_bg();        
+   	menustate = 6 
+		flyin_queuedmenu();
+		
+		start_spin( true );
+}
+
+function goto_waiting_screen(){
+    ignore_clicks = true;
+   	if( menustate == 7 ) return;
+		remove_menu();
+		if( menustate == 0 ) flyin_menu_bg();        
+   	menustate = 7 
+		flyin_waitingmenu();
+		start_spin( true );
+}
+
+function goto_connecting_screen(){
+    ignore_clicks = true;
+   	if( menustate == 8 ) return;
+		remove_menu();
+		if( menustate == 0 ) flyin_menu_bg();        
+   	menustate = 8 
+		flyin_connectingmenu();
+		start_spin( true );
+}
+
+
+function remove_menu(){
+		if( menustate == 1 ) flyout_idlemenu();        
+		if( menustate == 2 ) flyout_modemenu();        
+		if( menustate == 3 ) flyout_levelmenu();        
+		if( menustate == 4 ) flyout_timeoutmenu();        
+		if( menustate == 5 ) flyout_joinmenu();        
+		if( menustate == 6 ) flyout_queuedmenu();        
+		if( menustate == 7 ) flyout_waitingmenu();        
+		if( menustate == 8 ) flyout_connectingmenu();        
+}
+
+function clear_screen(){
+		remove_menu()
+		if( menustate != 0 ) flyout_menu_bg();        
+    menustate=0
+		ignore_clicks=false;
+		set_initial_position();
+}
+
+
+function clicked_quit(){
+		clog("ClientSent: QUIT ");
+		hookbox_conn.publish('clientcommand', {'position' : position, 'command' : 'QUIT' } );
+}
+
+function clicked_wake(){
+		clog("ClientSent: WAKE ");
+		hookbox_conn.publish('clientcommand', {'position' : position, 'command' : 'WAKE' } );
+}
+
+function clicked_alone(){
+	  selected_game_mode = "START_1P";
+		goto_level_screen( )
+}
+
+function clicked_3player(){
+	  selected_game_mode = "START_3P";
+	  goto_level_screen( )
+}
+
+function clicked_ignore(){
+	  interrupt_ok = false;
+	  clear_screen()
+}
+
+function clicked_join(){
+	  clear_screen()
+    //not implemented yet
+    hookbox_conn.publish('clientcommand', {'position' : position, 'command' : 'JOIN_3P' } );
+}
+
+
+
+
+
+
+</script>
+
+
+
+<script>
+
+
+$(document).ready(function() {
+	goto_connecting_screen();
+	update_timeout( );
+	document.title = "Cube P:" + position 
+});
+
+</script>
+
+</head>
+
+
+
+
+
+
+
+
+
+<body>
+    <div id="container">
+      {% block top %}
+      {% endblock %}
+			<div id="svgholder">
+       <canvas id="canvas" width=1100 height=1100></canvas>   
+			
+			</div>
+			
+
+			
+			<div class="bottomrow" >
+        <br>
+        <br>
+        <br>
+				<img class="button left"   id="buttonleft"  src="/static/button_left.png"      alt="Left"   ondragstart="return false" onselectstart="return false" >
+				<img class="button right"   id="buttonright" src="/static/button_right.png"    alt="Right"  ondragstart="return false" onselectstart="return false" >
+				<div class="clear"></div>
+			  <br>
+      </div>
+
+			<!-- <img class="button_restart" id="button_restart" src="/static/restart.png" alt="Restart"  ondragstart="return false" onselectstart="return false" onclick="goto_queued_screen()" > -->
+			<img class="button_quit"    id="button_quit" src="/static/quit.png"    alt="Restart"  ondragstart="return false" onselectstart="return false" onclick="clicked_quit()"    >
+
+			<img id="levelmenu_bgt" src="/static/line.png"  class="topborder" height=6 width=2000>
+			<div id="levelmenu_bg"class="levelmenu_bg" >
+			</div>
+			<img id="levelmenu_bgb" src="/static/line.png"  class="bottomborder" height=6 width=2000 >
+			
+			<div id="movesdisplay" class="movesdisplay" > 
+				<center>
+         	  <h1 id="movestext"></h1>
+				</center>
+			</div>
+
+			<div id="idlemenu" class="levelmenu" > <!-- onclick="clicked_wake()" > -->
+				<br><br><br><br><br><br>
+				<center>
+         	  <h1> Touch screen to start playing!</h1>
+				</center>
+			</div>
+			
+			<div id="modemenu" class="levelmenu"  >
+         <h2> Select game mode: </h2>
+					<center>
+					<img id="single"  src="/static/alone.png"   ondragstart="return false" onselectstart="return false" onclick="clicked_alone() "   >
+					<img id="multi"   src="/static/3player.png" ondragstart="return false" onselectstart="return false" onclick="clicked_3player() "   >
+					</center>
+			</div>
+			
+			<div id="levelmenu" class="levelmenu"  >
+         <h2> Select difficulty: </h2>
+					<center>
+					<img id="easy"    src="/static/easy.png"   ondragstart="return false" onselectstart="return false" >
+					<img id="medium"  src="/static/medium.png" ondragstart="return false" onselectstart="return false" >
+					<img id="hard"    src="/static/hard.png"   ondragstart="return false" onselectstart="return false" >
+					<img id="master"  src="/static/master.png" ondragstart="return false" onselectstart="return false" >
+					<br>
+					<br>
+					<img id="full"    src="/static/full.png" ondragstart="return false" onselectstart="return false" >
+					</center>
+			</div>
+
+			<div id="timeoutmenu" class="levelmenu"> 
+         <h2> Timeout! Press continue to return to game: </h2>
+				 <h1 id="timeout_display">50</h1>
+					<center>
+					<img id="continue"  src="/static/continue.png"   ondragstart="return false" onselectstart="return false"  onclick="clicked_continue();" >
+					</center>
+			</div>
+
+			<div id="joinmenu" class="levelmenu" >
+         <br>
+				 <h2> Player X wants to play a 3-player game: </h2>
+				 <br>
+				 <img id="ignorebutton"    src="/static/ignore.png"   ondragstart="return false" onselectstart="return false" onclick="clicked_ignore()" >
+				 &nbsp;&nbsp;&nbsp;&nbsp;
+				 <img id="joinbutton"    src="/static/join.png"       ondragstart="return false" onselectstart="return false" onclick="clicked_join()" >
+			</div>
+			
+			<div id="queuedmenu" class="levelmenu" >
+         <center>
+				 <br>
+				 <br>
+				 <br>
+				 <h2> Another player is currently playing Groovik's cube.  </h2>
+				 <h2> Please wait - you will be connected to the next available cube.  </h2>
+				 <br>
+				 <br>
+				 <img src="/static/waiting.gif">
+				 </center>
+			</div>
+
+			
+			<div id="waitingmenu" class="levelmenu" >
+         <center>
+				 <br>
+				 <br>
+				 <br>
+				 <h1> Waiting for other players to join the game!  </h1>
+				 <br>
+				 <br>
+				 <img src="/static/waiting.gif">
+				 </center>
+			</div>
+
+			<div id="connectingmenu" class="levelmenu" >
+         <center>
+				 <br>
+				 <br>
+				 <br>
+				 <h1> Connecting to Groovik's Cube's central brain. <br> Please wait..  </h1>
+				 <br>
+				 <br>
+				 <img src="/static/waiting.gif">
+				 </center>
+			</div>
+
+			<div class="footer" >
+			<font size=-1>
+     	<center>Groovik's Cube by GroovLabs<br>www.groovik.com</center> 
+			</font>
+			</div>
+
+
+       <div id="manual_rotate" class="debug">
+          Altitude: <input id="slide_alt" type="range" min="-1000" max="1000" value="220" onchange="rotate_view();"><br/>
+          Azimuth: <input id="slide_azi" type="range" min="-1000" max="1000" value="0" onchange="rotate_view();"><br/>
+       </div>
+       <div id="frameratediv" class="debug">
+       Framerate: <span id="framerate">...</span> fps
+       </div>
+
+   <script>
+
+     // Display debug stuff if URL snippet is #debug
+     $(document).ready( function() {
+        if( location.hash == "#debug" ) {
+            $(".debug").css('display','block');
+        }
+     });
+    
+    // Show SVG element if configured.
+    var svg;
+    if( RENDER_WITH_SVG ) {
+        $(document).ready( function() {
+            $('#svgholder').append('<h4>svg</h4><div id="svgdiv" style="width:300px; height:300px; background: black;"> </div>');
+            $('#svgdiv').svg({onLoad: store_svg_obj});
+        });
+    }
+    function store_svg_obj(new_svg) { 
+        svg = new_svg;
+    }
+
+    // Pulse the color of the header
+    function fade_to_red() {
+        $('.pulse').animate(
+          { 'color': '#f88' },
+          40000, 'linear', fade_to_yellow
+        );
+    }
+    function fade_to_yellow() {
+        $('.pulse').animate(
+          { 'color': '#ffd' },
+          40000, 'linear',fade_to_red
+        );
+    }
+    $(document).ready( function() {
+        fade_to_red();
+    });
+
+</script>
+    </div>
+
+<script type="text/javascript">
+
+// Only include GA if we're on port 80, i.e. production
+if( ! document.location.port ) {
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-16219925-1']);
+  _gaq.push(['_setDomainName', 'none']);
+  _gaq.push(['_setAllowLinker', true]);
+  _gaq.push(['_trackPageview']);
+
+  (function() {
+    var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+    ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+  })();
+}
+
+</script>
+    </script>
+
+
+
+
+
+    </body> 
+</html>  
+
+
