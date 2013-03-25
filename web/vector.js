@@ -225,7 +225,7 @@ function buildMatrixToRotateAroundAxisByAngle( vAxis, angle )
 	
     r.m[1][0] = u.v[1] * u.v[0] * ( 1.0 - cosAngle ) + u.v[2] * sinAngle;
 	r.m[1][1] = cosAngle + u.v[1] * u.v[1] * ( 1.0 - cosAngle ); 
-	r.m[1][2] = u.v[1] * u.v[2] * ( 1.0 - cosAngle ) - u.v[1] * sinAngle;
+	r.m[1][2] = u.v[1] * u.v[2] * ( 1.0 - cosAngle ) - u.v[0] * sinAngle;
 	r.m[1][3] = 0.0;
 	
     r.m[2][0] = u.v[2] * u.v[0] * ( 1.0 - cosAngle ) - u.v[1] * sinAngle;
