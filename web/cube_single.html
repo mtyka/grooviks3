@@ -1,0 +1,1058 @@
+<html>
+<head>
+<title>Groovik's Single-Player Cube</title>
+<script src="/static/jquery.min.js"></script>
+<script src="/static/jquery-ui.min.js"></script>
+<script src="/static/jquery.svg.js"></script>
+<script type="text/javascript" src="/static/jquery.svganim.js"></script> 
+<script type="text/javascript" src="/static/jquery.svgdom.js"></script> 
+<script type="text/javascript" src="/static/jquery.svgfilter.js"></script> 
+<script type="text/javascript" src="/static/jquery.svggraph.js"></script> 
+<script type="text/javascript" src="/static/jquery.svgplot.js"></script> 
+
+<script type="text/javascript" src="/static/vector.js" />
+
+<script type="text/javascript"> 
+var time_of_inactivity_to_reload_page = 900
+var time_to_reload = time_of_inactivity_to_reload_page
+function beginrefresh(){
+	if (time_to_reload<=1){
+		window.location.reload()
+	}
+	
+	time_to_reload-=1
+	window.status=time_to_reload
+	setTimeout("beginrefresh()",1000) // call me again in 1000 ms
+}
+
+window.onload=beginrefresh
+</script>
+
+<script type="text/javascript">
+
+var HOW_LONG_STABLE_BEFORE_SHOWING_ARROWS = 700;  // ms
+
+var HOW_OFTEN_DISPLAY_FRAMERATE = 400;  // ms between updates
+var RENDER_WITH_CANVAS = true;
+
+function get_querystring_parameter(name) {
+    var match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+
+var position = get_querystring_parameter('position') || null;
+var game_id = get_querystring_parameter('game') || null;
+
+var frames_rendered=0;
+var frame_cnt_reset_at = (new Date()).getTime(); // epoch time in ms
+
+function display_framerate() {
+    var now = (new Date()).getTime();
+    var howlong_ms = now - frame_cnt_reset_at;
+    var fps = frames_rendered * 1000 / howlong_ms;
+    $('#framerate').html( Math.floor(fps*10) / 10 );
+
+    // reset
+    frames_rendered = 0;
+    frame_cnt_reset_at = now;
+}
+
+$(document).ready(function() {
+    setInterval( display_framerate, HOW_OFTEN_DISPLAY_FRAMERATE );
+});
+
+jQuery.fn.elementlocation = function() {
+  var curleft = 0;
+  var curtop = 0;
+ 
+  var obj = this;
+ 
+  do {
+    curleft += obj.attr('offsetLeft');
+    curtop += obj.attr('offsetTop');
+ 
+    obj = obj.offsetParent();
+  } while ( obj.attr('tagName') != 'BODY' );
+ 
+ 
+  return ( {x:curleft, y:curtop} );
+};
+
+
+// ####################################################################
+// ######################## Control Logic #############################
+// ####################################################################
+
+
+// safe way to log things on webkit and not blow up firefox
+function clog(msg) {
+    if( window.console ) {
+        console.log(msg);
+    }
+}
+
+
+var first_connection = true;
+
+function set_cube_colors( cube ) {
+  if (cube.datagram) {
+    current_cube_colors = decompress_datagram(cube.datagram);
+  } else {
+    console.error("Unsupported cube");
+    console.dir(cube);
+  }
+}
+
+function game_timeout_occured() {
+	clicked_quit();	
+}
+
+
+// Converts a long hex string into an array of 54 RGB-float-triples
+function decompress_datagram(datagram) {
+    var output = [];
+    while( datagram.length > 0 ) {
+        var rgb = datagram.substring(0,6);
+        datagram = datagram.substring(6);
+        output[output.length] = parse_hex_rgb(rgb);
+    }
+    return output;
+}
+
+function parse_hex_rgb(hexstring) {
+    var rgb_floats = [];
+    for(i=0; i<3; i++) {
+      var rgbhex = hexstring.substring(i*2, 2 + i*2);
+      var rgbint = parseInt(rgbhex,16);
+      rgb_floats[i] = rgbint / 255.0;
+    }
+    return rgb_floats;
+}
+
+
+//
+// rendering stuff
+//
+
+
+function update_view() {
+   // looks at the view sliders and renders-the cube with that and the current color-state
+   var altitude = $("#slide_alt").val() / 100.0;
+   var azimuth = $("#slide_azi").val() / 100.0;
+   var height = $('#canvas').attr('height');
+   var width = $('#canvas').attr('width');
+   render_view(height, width, altitude, azimuth, 15 );
+   //window.setTimeout( update_view, 50 );
+
+   frames_rendered ++;
+}
+
+
+var client_state = "IDLE";
+var game_state = "UNBOUND";
+var active_position = 0;
+
+var game_timeout = -2;
+var inactivity_timeout = -1;
+var ignore_clicks = false;
+var locked_buttons=false;
+var menustate = 0;
+var interrupt_ok=true;
+
+
+function set_ignore_clicks( value ){
+	ignore_clicks = value;
+}
+
+function rotate_view() {
+    update_view();
+}
+
+//window.addEventListener("touchmove", function(e) {
+//  e.preventDefault();
+//});
+
+move_count = 0;
+
+function register_move(move) {
+  
+}
+
+var move_matrix = {
+    
+  "F": { 
+    18: 20, 19: 23, 20: 26, 21: 19, 22: 22, 23: 25, 24: 18, 25: 21, 26: 24,
+    2: 53, 5: 52, 8: 51, 9: 9, 12: 12, 15: 15, 42: 42, 43: 43, 44: 44, 51: 51, 52: 52, 53: 53,
+  },
+};
+
+function apply_move(move) {
+  
+}
+
+ $(document).ready( function() {
+    // Draw the cube in its default state when the page first loads
+    update_view();
+    var rotate_start = null;
+
+    var grab_handler = function(event) {
+      var top_left_canvas_corner = $("#canvas").elementlocation();
+      var relx = event.pageX - top_left_canvas_corner.x;
+      var rely = event.pageY - top_left_canvas_corner.y;
+      console.debug("Grabbed at (%d, %d)", relx, rely);
+      facenum = whichFaceIsPointIn(relx, rely);
+      if( facenum < 0 ) {
+        clog("Click not on face");
+        rotate_degrees = 0; 
+        return;
+      }
+      clog("Click on face " + facenum);
+
+      rotate_start = event;
+      rotate_layer = layerForFace(facenum);
+      clog("Rotating layer " + rotate_layer);
+    };
+
+    var drag_handler = function(event) {
+//      alert("Touchmove: (" + event.pageX + ", " + event.pageY + ")");
+      if (rotate_start == null) { return; }
+      var dx = event.pageX - rotate_start.pageX;
+      var dy = event.pageY - rotate_start.pageY;
+      clog("Mouse move (" + dx + ", " + dy + ")");
+      // TODO(david): Improve this.  One idea:
+      //  1. Find the 3D plane on which the user's original click lies (the grab point G).
+      //  2. Locate the center C of the circle on that plane that describes the possible
+      //     locations of the grab point upon rotation.
+      //  3. Project the user's current mouse position (P, the projected point) onto the plane.
+      //  4. Measure the angle made by the two vectors (C -> G, C -> P).
+      var dir = dy < 0 ? -1 : 1;
+      var mag = Math.sqrt(dx * dx + dy * dy);
+      rotate_degrees = dir * mag / 2;
+      clog("Rotate face " + layer_names[rotate_layer] + " " + rotate_degrees + " degrees");
+      update_view();
+    };
+    
+    var release_handler = function(event) {
+      // Round to the nearest 90 degrees
+      // TODO(david): If in an ambiguous location (e.g. 135 deg), snap back to start instead?
+      var num_turns = (Math.round(rotate_degrees / 90) + 4000) % 4; // +4000 hack b/c JS mod is broken
+      if (num_turns > 0) {
+        var move = makeMoveName(rotate_layer, num_turns);
+        console.info("Move is " + move);
+        // TODO register_move with server
+        apply_move(move);
+      } else {
+        console.info("No move for rotation of %f degrees", rotate_degrees);
+      }
+      rotate_start = null;
+      rotate_degrees = 0;
+      update_view();
+    };
+
+    $("body").bind("mousedown", grab_handler, false);
+    $("body").bind("mousemove", drag_handler, false);
+    $("body").bind("mouseup", release_handler, false);
+
+    $("body").bind("touchmove", function(event) {
+        event.preventDefault();
+//        alert("Touch at (" + event.pageX + ", " + event.pageY + ")");
+        var dx = event.pageX;
+        var dy = event.pageY;
+//        alert("Touch delta (" + dx + ", " + dy + ")");
+        var dir = dy < 0 ? -1 : 1;
+        var mag = Math.sqrt(dx * dx + dy * dy);
+        rotate_degrees = dir * mag / 2;
+        update_view();
+    }, false);
+
+//		$("body").click( function( eventObj ) {
+//			if( !ignore_clicks ){
+//				 //var x = eventObj.pageX;
+//				 //var y = eventObj.pageY;
+//				 //clog("local click at absolute ("+x+","+y+")");
+//
+//				 var top_left_canvas_corner = $("#canvas").elementlocation();
+//				 var x = eventObj.pageX - top_left_canvas_corner.x;
+//				 var y = eventObj.pageY - top_left_canvas_corner.y;
+//
+//				 //clog("local click at relative ("+x+","+y+")");
+//
+//				 cube_got_clicked_on(x,y);
+//			
+//				 return true;
+//			}
+//		});
+});
+
+var faceclick_subscription;
+var lastFaceClicked = -1;
+var renderClickedFaceCount = 0;
+
+function cube_got_clicked_on(x,y) 
+{
+    facenum = whichFaceIsPointIn(x,y);
+    if( facenum < 0 )
+	{
+     	// not on a cube face
+     	clog("Local click not on cube face.");
+     	return;
+    }
+    //faceclick_subscription.publish( facenum );  // docs say this should work but it doesn't
+    if (shouldDrawArrow(facenum)) {
+        clog("Publishing local click on face "+facenum);
+      	var rotation_direction = arrowRotation[facenum][0] > 0;
+      	// See QueueRotation in groovik.py
+      	// TODO(bretford): mapping is weird, fix
+      	var rotation_index = arrowRotation[facenum][1] + (Math.abs(arrowRotation[facenum][0]))%3*3;
+        // TODO(david): Send the update to the server
+//      	hookbox_conn.publish('faceclick', [facenum, rotation_index, rotation_direction] );
+        // TODO(david): Local animation of cube moves
+    
+        lastFaceClicked = facenum;
+        // TODO(david): Figure out which face is rotating.
+		setRotatingLayer( layerForFace(facenum) );
+		renderClickedFaceCount = 5;
+		update_view();
+	}
+}
+
+function reset_gamestate(position, difficulty) {
+    clog("Resetting gamestate: " + difficulty);
+    hookbox_conn.publish('clientcommand', {'position' : position, 'command' : 'SELECT_DIFFICULTY', 'difficulty' : difficulty});
+}
+
+// ####################################################################
+// ###################### Cube Rendering ##############################
+// ####################################################################
+
+function hex_digit_from_int(num) {
+    return num.toString(16);
+}
+
+function hex_from_float(num) {
+  var i = Math.floor( num * 255 );
+  var result = hex_digit_from_int( Math.floor(i/16) );
+  result += hex_digit_from_int( i % 16 );
+  return result;
+}
+
+function hex_colorstring_from_array( colorvec ) 
+{
+    return "#" 
+            + hex_from_float(colorvec[2])
+            + hex_from_float(colorvec[1])
+            + hex_from_float(colorvec[0]);
+}
+
+
+var svg_polygons = [];
+
+//-----------------------------------------------------------------------------
+// This draws a quad, projecting it from world space to screenspace, and then rendering it.
+// Arguments:
+// viewProj: a matrix which concatenates the view + projection matrices
+// viewProjViewport: a matrix which concatenates the view, projection, and viewport matrices
+// 
+//-----------------------------------------------------------------------------             
+function drawQuad( ctx, viewProj, viewProjViewport, p1, p2, p3, p4, color, ndx ) 
+{
+    //TODO: a bunch of this vector math can be optimized out if we're
+    // just rendering SVG and not canvas.
+    // In fact, it should be asbracted out and cached only on view rotation.
+
+    // Backface cull first
+    var b1 = vectorMultiplyProjective( viewProj, p1 );
+    var b2 = vectorMultiplyProjective( viewProj, p2 );
+    var b3 = vectorMultiplyProjective( viewProj, p3 );
+    var e1 = vectorSubtract( b2, b1 );
+    var e2 = vectorSubtract( b3, b1 );
+    var c = vectorCross( e1, e2 );
+    if ( c.v[2] <= 0.0 )
+    {
+        return;
+    }
+
+    //color = "rgba(" + Math.round(255.0*color[2]) + "," + Math.round(255.0*color[1]) + "," + Math.round(255.0*color[0]) + ",1)";
+    // SVG rendering on ipad does not understand rgba colors!
+    color = hex_colorstring_from_array(color);
+
+
+    // Transform all points into viewport space
+    var vp1 = vectorMultiplyProjective( viewProjViewport, p1 );  
+    var vp2 = vectorMultiplyProjective( viewProjViewport, p2 );  
+    var vp3 = vectorMultiplyProjective( viewProjViewport, p3 );  
+    var vp4 = vectorMultiplyProjective( viewProjViewport, p4 );
+
+    if( RENDER_WITH_CANVAS ) {
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 1.0; 
+         
+        // Draw a filled quad  
+        ctx.beginPath();   
+        ctx.moveTo(vp1.v[0], vp1.v[1]);   
+        ctx.lineTo(vp2.v[0], vp2.v[1]);   
+        ctx.lineTo(vp3.v[0], vp3.v[1]);   
+        ctx.lineTo(vp4.v[0], vp4.v[1]);   
+        ctx.closePath();   
+        ctx.fill();
+    }
+}   
+
+//-----------------------------------------------------------------------------
+// This returns true if the specified point in screen space is inside the
+// quad specified in world space.
+// Arguments:
+// viewProj: a matrix which concatenates the view + projection matrices
+// viewProjViewport: a matrix which concatenates the view, projection, and viewport matrices
+//-----------------------------------------------------------------------------
+function isPointInQuad( ctx, viewProj, viewProjViewport, p1, p2, p3, p4, point )
+{
+    // Backface cull first, ignore backfaced triangles
+    var b1 = vectorMultiplyProjective( viewProj, p1 );
+    var b2 = vectorMultiplyProjective( viewProj, p2 );
+    var b3 = vectorMultiplyProjective( viewProj, p3 );
+    var e1 = vectorSubtract( b2, b1 );
+    var e2 = vectorSubtract( b3, b1 );
+    var c = vectorCross( e1, e2 );
+    if ( c.v[2] <= 0.0 )
+    {
+        return;
+    }
+
+    // Transform all points into viewport space
+    var vp1 = vectorMultiplyProjective( viewProjViewport, p1 );
+    var vp2 = vectorMultiplyProjective( viewProjViewport, p2 );
+    var vp3 = vectorMultiplyProjective( viewProjViewport, p3 );
+    var vp4 = vectorMultiplyProjective( viewProjViewport, p4 );
+
+    // Now do a point in polygon test
+    // See http://local.wasp.uwa.edu.au/~pbourke/geometry/insidepoly/  Solution 3 (2D)
+    var i1 = (point.v[1] - vp1.v[1]) * (vp2.v[0] - vp1.v[0]) - (point.v[0] - vp1.v[0]) * (vp2.v[1] - vp1.v[1]);
+    var i2 = (point.v[1] - vp2.v[1]) * (vp3.v[0] - vp2.v[0]) - (point.v[0] - vp2.v[0]) * (vp3.v[1] - vp2.v[1]);
+    var i3 = (point.v[1] - vp3.v[1]) * (vp4.v[0] - vp3.v[0]) - (point.v[0] - vp3.v[0]) * (vp4.v[1] - vp3.v[1]);
+    var i4 = (point.v[1] - vp4.v[1]) * (vp1.v[0] - vp4.v[0]) - (point.v[0] - vp4.v[0]) * (vp1.v[1] - vp4.v[1]);
+
+    if ( ( i1 == 0 ) || ( i2 == 0 ) || ( i3 == 0 ) || ( i4 == 0 ) )
+    {
+        return 1;
+    }
+
+    if ( i1 > 0 )
+    {
+        return ( i2 > 0 ) && ( i3 > 0 ) && ( i4 > 0 );
+    }
+
+    return ( i2 < 0 ) && ( i3 < 0 ) && ( i4 < 0 );
+}
+
+
+// returns a hashmap with .ctx, .viewProj and .viewProjViewport
+function build_view_context( ) {
+    var canvas = document.getElementById("canvas");   
+    var ctx = canvas.getContext("2d");   
+    var altitude = $("#slide_alt").val() / 100.0;
+    var azimuth = $("#slide_azi").val() / 100.0;
+
+    var height = $('#canvas').attr('height');
+    var width = $('#canvas').attr('width');
+    var distance = 15;
+
+
+    // Build the projection matrix
+    // Note that the camera looks down -z in view space and the viewplane is at z = -1
+    var aspectRatio = height / width;    
+    var proj = buildProjectionMatrix( -0.3, 0.3, -0.3 * aspectRatio, 0.3 * aspectRatio, 1.0, 50.0 );
+
+    // Build the view matrix
+    var center = new vec4;
+    var up = new vec4;
+
+ 	up.v[0] = up.v[1] = up.v[2] = 1.0;
+	var start = new vec4;
+	start.v[0] = start.v[1] = 1.0; start.v[2] = -1.0; start.v[3] = 0.0;
+	var eyeUnnormalized = rotateVectorAboutAxisAndAngle( start, up, azimuth );
+	var eye = vectorMultiplyScalar( vectorNormalize( eyeUnnormalized ), distance );
+
+   	eye.v[3] = center.v[3] = up.v[3] = 0.0;   
+    var view = buildViewMatrix( eye, center, up );    
+
+    // Build the viewport transform
+    var viewport = buildViewportTransform( width, height );
+   
+    // viewProjViewport matrix will transform all points from world space to screen space
+    var viewProj = multiplyMatrix( proj, view );
+    var viewProjViewport = multiplyMatrix( viewport, viewProj );    
+
+    return { 'ctx': ctx,
+             'viewProj': viewProj,
+             'viewProjViewport': viewProjViewport
+           };
+}
+
+
+
+// Returns a number 0-53 if the x,y point (relative to canvas) is one of the faces.
+// Returns -1 if no match.
+function whichFaceIsPointIn( x,y )
+{
+    var point = new vec4;
+    point.v[0] = x;
+    point.v[1] = y;
+
+    var view_context = build_view_context();
+
+    var quadlist = buildQuadList( view_context['ctx'], view_context['viewProj'], view_context['viewProjViewport'] );
+    for( ndx=0; ndx<54; ndx++) {
+        var quad = quadlist[ndx];
+        if( isPointInQuad( view_context['ctx'], view_context['viewProj'], view_context['viewProjViewport'], quad[0], quad[1], quad[2], quad[3], point ) ) {
+            // found it.  break out of loop.
+            return ndx;
+        }
+    }
+    return -1;
+}
+
+function sideForFace( facenum ) {
+    return Math.floor(facenum / 9);
+}
+
+var rotate_layer = 0;
+var rotate_degrees = 0;
+
+var layer_faces = [
+  [1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,1,0,0,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,1,0,0,1,0,0,1,0,0],
+  [0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,0,0,1,0,0,1,0,0,1,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,0,0,1,0,0,1,0,0,1],
+  [0,0,1,0,0,1,0,0,1,1,0,0,1,0,0,1,0,0,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,1,1,1],
+  [1,0,0,1,0,0,1,0,0,0,0,1,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0],
+  [0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0],
+  [1,1,1,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1],
+  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0],
+  [0,0,0,1,1,1,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  [0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,1,1,1,0,0,0],
+];
+
+function isFaceOnLayer( layer, facenum ) {
+  return layer_faces[layer][facenum];
+}
+
+// Layer numbers correspond to the side numbers, plus the middle layers
+//  0 1 2 3 4 5 6 7 8
+//  R L F B D U M E S
+layer_names = [ 'R', 'L', 'F', 'B', 'D', 'U', 'M', 'E', 'S', ];
+
+// Clockwise: "" (empty)
+// Anticlockwise: "'" (single quote)
+// 180%: "2"
+turns_names = [ null, '', '2', "'", ];
+
+function makeMoveName( layer, nTurns ) {
+  if (layer < 0 || layer > 8) { console.error("Invalid layer '%d'", layer); }
+  if (nTurns < 1 || nTurns > 3) { console.error("Invalid number of turns '%d'", nTurns); }
+  return layer_names[layer] + turns_names[nTurns];
+}
+
+// Get the layer that is rotated when clicking on a given face.
+function layerForFace( facenum ) {
+  switch (facenum) {
+    // White (F) and Yellow (B), rotating Green (R), Blue (L) and Middle (M)
+    case 18: case 24: case 29: case 35: return 0;
+    case 20: case 26: case 27: case 33: return 1;
+    case 19: case 25: case 28: case 34: return 6;
+    // Red (U) and Orange (D), rotating White (F), Yellow (B) and Standing (S)
+    case 51: case 53: case 42: case 44: return 2;
+    case 45: case 47: case 36: case 38: return 3;
+    case 48: case 50: case 39: case 41: return 8;
+    // Green (R) and Blue (L), rotating Orange (D), Red (U) and Equator (E)
+    case 15: case 17: case  6: case  8: return 4;
+    case  9: case 11: case  0: case  2: return 5;
+    case 12: case 14: case  3: case  5: return 7;
+    default:
+      console.error("Invalid face " + facenum);
+  }
+}
+
+function setRotatingLayer( layer ) {
+  rotate_layer = layer;
+}
+
+function isFacetRotated( facenum ) {
+  side = sideForFace(facenum);
+  if (side == rot_side) {
+    return true;
+  }
+  return false;
+}
+
+function rotAxis() {
+  var axis = new vec4();
+  switch (rotate_layer) {
+    case 0: case 6: vectorSet(axis, -1,  0,  0, 0); break;
+    case 1:         vectorSet(axis,  1,  0,  0, 0); break;
+    case 2: case 8: vectorSet(axis,  0, -1,  0, 0); break;
+    case 3:         vectorSet(axis,  0,  1,  0, 0); break;
+    case 4:         vectorSet(axis,  0,  0, -1, 0); break;
+    case 5: case 7: vectorSet(axis,  0,  0,  1, 0); break;
+  }
+  return axis;
+}
+
+function buildQuadList( ctx, viewProj, viewProjViewport ) {
+    // This code generates the 54 quads representing the 54 pixels of the cube    
+    var crossAxis = [ [1, 2], [0, 2], [0, 1] ];
+    var invertAxis = [ [false, false], [true, false], [true, false], [false, false], [false, false], [true, false] ];
+    var gapSize = 0.08;
+    var p = new vec4;
+    var d = [ 0.0, 0.0, 0.0 ];
+    var g = [ 0.0, 0.0, 0.0 ];
+
+    var angle = rotate_degrees * Math.PI / 180;
+    var rotMatrix = buildMatrixToRotateAroundAxisByAngle( rotAxis(), angle );
+
+    var black = [ 0.0, 0.0, 0.0, 0.0 ];
+    var quadlist = [];
+    for ( var i = 0; i < 6; ++i )
+    {
+        var axis = i >> 1;
+        p.v[axis] = 3.0;
+        if ( i & 1 )
+        {
+            p.v[axis] *= -1.0;
+        }
+        d[axis] = 0.0;
+
+        var a0 = crossAxis[ axis ][ 0 ];
+        var a1 = crossAxis[ axis ][ 1 ];
+        var s0 = 1.0;
+        var s1 = 1.0;
+        if ( invertAxis[ i ][ 0 ] )
+        {
+            s0 *= -1.0;
+        }
+        if ( invertAxis[ i ][ 1 ] )
+        {
+            s1 *= -1.0
+        }
+        d[a0] = ( 2.0 - 2.0 * gapSize ) * s0;
+        d[a1] = ( 2.0 - 2.0 * gapSize ) * s1;
+        g[a0] = gapSize * s0;
+        g[a1] = gapSize * s1;
+        p.v[a1] = -3.0 * s1 + g[a1];
+        for ( var j = 0; j < 3; j++ )
+        {
+            p.v[a0] = -3.0 * s0 + g[a0]
+            for ( var k = 0; k < 3; k++ )
+            {           
+                var p1 = vectorCopy( p );
+
+                p.v[ a0 ] += d[ a0 ]
+                var p2 = vectorCopy( p );
+
+                p.v[ a1 ] += d[ a1 ];
+                var p3 = vectorCopy( p );
+                
+                p.v[ a0 ] -= d[ a0 ];
+                var p4 = vectorCopy( p );
+
+                var ndx = i*9 + j*3 + k
+                
+                if (isFaceOnLayer( rotate_layer, ndx )) {
+                  p1 = vectorMultiply(rotMatrix, p1);
+                  p2 = vectorMultiply(rotMatrix, p2);
+                  p3 = vectorMultiply(rotMatrix, p3);
+                  p4 = vectorMultiply(rotMatrix, p4);
+                }
+                
+                quadlist[ ndx ] = [p1,p2,p3,p4];
+                
+                p.v[ a1 ] -= d[ a1 ];
+                p.v[ a0 ] += d[ a0 ] + 2.0 * g[ a0 ];
+            }                     
+            p.v[ a1 ] += d[ a1 ] + 2.0 * g[ a1 ];
+        }
+    }
+    // TODO(david): Order quads back to front
+    return quadlist;
+}
+
+//-----------------------------------------------------------------------------
+//  This determines whether an arrow should be drawn, and/or should be 
+//   available for click
+//-----------------------------------------------------------------------------
+function shouldDrawArrow( faceNum )
+{
+    // If we're in single player mode, verify that this arrow is intended for this player
+    if ( ignore_clicks ){
+		  return false;
+		}
+
+		if ( client_state == "MULT" )  
+    {
+			if (arrowRotation[faceNum][2] != position)
+					return false;
+    }
+
+    // Verify that this is a facet that deserves an arrow in any condition
+    return (arrowRotation[faceNum][0] != 0);
+
+}
+
+//-----------------------------------------------------------------------------
+// This draws an arrow, projecting it from world space to screenspace, and then rendering it.
+// Arguments:
+// viewProj: a matrix which concatenates the view + projection matrices
+// viewProjViewport: a matrix which concatenates the view, projection, and viewport matrices
+// p1-p4: the 4 quad points to render in
+// orientation: a number 0-3 indicating the orientation
+//-----------------------------------------------------------------------------
+function drawArrow( ctx, viewProj, viewProjViewport, p1, p2, p3, p4, orientation, color )
+{
+    // Backface cull first
+    var b1 = vectorMultiplyProjective( viewProj, p1 );
+    var b2 = vectorMultiplyProjective( viewProj, p2 );
+    var b3 = vectorMultiplyProjective( viewProj, p3 );
+    var e1 = vectorSubtract( b2, b1 );
+    var e2 = vectorSubtract( b3, b1 );
+    var c = vectorCross( e1, e2 );
+    if ( c.v[2] <= 0.0 )
+    {
+        return;
+    }
+
+    ctx.fillStyle = "rgba(" + Math.round(255.0*color[2]) + "," + Math.round(255.0*color[1]) + "," + Math.round(255.0*color[0]) + ",1)";
+    ctx.globalAlpha = 1.0;
+
+    // Build basis
+    var origin;
+    var up;
+    var right;
+    if ( orientation == 0 )
+    {
+        origin = p1;
+        up = vectorSubtract( p4, p1 );
+        right = vectorSubtract( p2, p1 );
+    }
+    else if ( orientation == 1 )
+    {
+        origin = p2;
+        up = vectorSubtract( p1, p2 );
+        right = vectorSubtract( p3, p2 );
+    }
+    else if ( orientation == 2 )
+    {
+        origin = p3;
+        up = vectorSubtract( p2, p3 );
+        right = vectorSubtract( p4, p3 );
+    }
+    else if ( orientation == 3 )
+    {
+        origin = p4;
+        up = vectorSubtract( p3, p4 );
+        right = vectorSubtract( p1, p4 );
+    }
+
+    // Build arrow points
+    var borderAmount = 0.1;
+    var baseAmount = 0.3;
+    var arrowVertAmount = 0.4;
+
+    var a1 = vectorMultiplyAdd2( origin, up, borderAmount, right, baseAmount );
+    var a2 = vectorMultiplyAdd2( origin, up, borderAmount, right, 1.0 - baseAmount );
+    var a3 = vectorMultiplyAdd2( origin, up, arrowVertAmount, right, 1.0 - baseAmount );
+    var a4 = vectorMultiplyAdd2( origin, up, arrowVertAmount, right, 1.0 - borderAmount );
+    var a5 = vectorMultiplyAdd2( origin, up, 1.0 - borderAmount, right, 0.5 );
+    var a6 = vectorMultiplyAdd2( origin, up, arrowVertAmount, right, borderAmount );
+    var a7 = vectorMultiplyAdd2( origin, up, arrowVertAmount, right, baseAmount );
+
+    // Transform all points into viewport space
+    var vp1 = vectorMultiplyProjective( viewProjViewport, a1 );
+    var vp2 = vectorMultiplyProjective( viewProjViewport, a2 );
+    var vp3 = vectorMultiplyProjective( viewProjViewport, a3 );
+    var vp4 = vectorMultiplyProjective( viewProjViewport, a4 );
+    var vp5 = vectorMultiplyProjective( viewProjViewport, a5 );
+    var vp6 = vectorMultiplyProjective( viewProjViewport, a6 );
+    var vp7 = vectorMultiplyProjective( viewProjViewport, a7 );
+
+    // Draw a filled quad
+    ctx.beginPath();
+    ctx.moveTo(vp1.v[0], vp1.v[1]);
+    ctx.lineTo(vp2.v[0], vp2.v[1]);
+    ctx.lineTo(vp3.v[0], vp3.v[1]);
+    ctx.lineTo(vp4.v[0], vp4.v[1]);
+    ctx.lineTo(vp5.v[0], vp5.v[1]);
+    ctx.lineTo(vp6.v[0], vp6.v[1]);
+    ctx.lineTo(vp7.v[0], vp7.v[1]);
+    ctx.closePath();
+    ctx.fill();
+}
+
+// x = 1,-1 y = 2,-2 z = 3,-3 !rotate = 0
+// Second ordinal is the row #
+arrowRotation = [
+		 [2,2,3],[0,0,3],[-2,2,3],[2,1,3],[0,0,3],[-2,1,3],[2,0,3],[0,0,3],[-2,0,3],  
+		 [2,2,3],[0,0,3],[-2,2,3],[2,1,3],[0,0,3],[-2,1,3],[2,0,3],[0,0,3],[-2,0,3], 
+
+		 [3,0,1],[3,1,1],[3,2,1],[0,0,1],[0,0,1],[0,0,1],[-3,0,1],[-3,1,1],[-3,2,1],
+		 [-3,2,1],[-3,1,1],[-3,0,1],[0,0,1],[0,0,1],[0,0,1],[3,2,1],[3,1,1],[3,0,1],
+
+		 [1,2,2],[0,0,2],[-1,2,2],[1,1,2],[0,0,2],[-1,1,2],[1,0,2],[0,0,2],[-1,0,2],
+		 [1,2,2],[0,0,2],[-1,2,2],[1,1,2],[0,0,2],[-1,1,2],[1,0,2],[0,0,2],[-1,0,2],
+];
+
+// x[],y[],z[] then
+// +x,-x,+y,-y,+z,-z
+rotToOrient = [[ -1, -1, 1, 3, 1, 1 ],
+               [ 1, 1, -1, -1, 0, 0 ], 
+               [ 2, 2, 2, 0, -1, -1 ]];
+
+
+function drawCube( ctx, viewProj, viewProjViewport, colors )
+{
+	var red = [ 0.0, 0.7, 1.0 ];
+    var quadlist = buildQuadList( ctx, viewProj, viewProjViewport );
+    for( ndx=0; ndx<54; ndx++) {
+        var quad = quadlist[ndx];
+
+        // draw the arrow slightly darker than the actual color
+        var darkcolor = [ colors[ndx][0]*.6, colors[ndx][1]*.6, colors[ndx][2]*.6 ]
+        drawQuad( ctx, viewProj, viewProjViewport, quad[0], quad[1], quad[2], quad[3], colors[ndx], ndx );
+		var arrowDirection = -1;
+		if (shouldDrawArrow(ndx)) {
+            var sign = arrowRotation[ndx][0] < 0;
+            arrowDirection = rotToOrient[Math.abs(arrowRotation[ndx][0]) - 1][Math.floor(ndx / 9)]
+            if (sign) {
+              arrowDirection = (2 + arrowDirection) % 4
+            }
+            //clog(arrowRotation[ndx], Math.floor(ndx/9), sign, arrowDirection)
+            if (arrowDirection >= 0) 
+			{
+           		drawArrow( ctx, viewProj, viewProjViewport, quad[0], quad[1], quad[2], quad[3], arrowDirection, darkcolor );
+			}
+        }
+
+		if ( ( lastFaceClicked >= 0 ) && (lastFaceClicked == ndx ) )
+		{
+       		if (arrowDirection >= 0) 
+			{
+	             drawArrow( ctx, viewProj, viewProjViewport, quad[0], quad[1], quad[2], quad[3], arrowDirection, red );
+	        }
+			renderClickedFaceCount--;
+			if ( renderClickedFaceCount <= 0 )
+			{
+				lastFaceClicked = -1;
+			}
+		}
+    }           
+}
+
+
+    // Initialize the cube with gray until it connects to the server.
+    var current_cube_colors = new Array( 54 );
+    var index = 0;
+    for ( var i = 0; i < 6; ++i )
+    {
+        for ( var j = 0; j < 9; ++j )
+        {
+            current_cube_colors[index] = [0.2, 0.2, 0.2];
+            index++;            
+        }
+    }
+    
+    $.get('/gc1/games/' + game_id, function(response) {
+        set_cube_colors(response.cube);
+        update_view();
+    }, "json");
+
+function render_view( width, height, altitude, azimuth, distance ) 
+{ 
+    var canvas = document.getElementById("canvas");   
+    var ctx = canvas.getContext("2d");   
+
+    // Clear to black
+    ctx.save();   
+    ctx.fillStyle = "black";   
+    ctx.fillRect( 0, 0, width, height );   
+    ctx.restore();   
+    
+    var view_context = build_view_context();
+    drawCube( view_context['ctx'], view_context['viewProj'], view_context['viewProjViewport'], current_cube_colors );
+}
+
+$(document).ready(function(){
+    $("#rookie").click(  function(){ reset_gamestate(position, 1); } );
+    $("#student").click( function(){ reset_gamestate(position, 3); } );
+    $("#master").click(  function(){ reset_gamestate(position, 7); } );
+
+    if (!position) {
+        $("#buttonleft").click( function(){ 
+           animate_spin( -Math.PI*2/3 );
+        });
+        $("#buttonright").click( function(){ 
+           animate_spin( Math.PI*2/3 );
+        });
+    } else {
+        $("#buttonleft, #buttonright").css('visibility', 'hidden');
+
+        // using -Math.PI*2/3 for the rotation angle gives a funny angle when rendered - I suspect there is a bug in render.js
+        var start_azimuth = parseInt([ -Math.PI*2/3.1, 0, Math.PI*2/3.1 ][position-1] * 100);
+        clog('start azi: ' + start_azimuth);
+        $("#slide_azi").val(  start_azimuth );
+        rotate_view(); 
+    }
+
+});
+
+var locked_buttons=false;
+
+function animate_spin(delta_radians) {
+  // lock the buttons
+  if(locked_buttons) return;
+  locked_buttons = true;
+
+  // do the boogie 
+  var azimuth = $("#slide_azi").val()*1.0; // convert from string to number. javascript sucks
+  azimuth = azimuth % (100*Math.PI*2);  // Re-center
+  $("#slide_azi").attr("animate_val", azimuth); // prep temporary animation variable
+  azimuth += delta_radians*100;
+  //console.log(azimuth);
+  $("#slide_azi").animate( { 
+   animate_val: azimuth 
+  },{ duration: 2000, 
+      complete: function(){
+     locked_buttons = false;
+    },
+    step: function() {
+      //console.log($("#slide_azi").attr("animate_val") ); 
+      $("#slide_azi").val( $("#slide_azi").attr("animate_val") );
+      rotate_view(); 
+    }
+  });
+}
+</script>
+
+<style>
+    .debug {
+        display:none;
+    }
+
+    body {
+        font-family: verdana, sans-serif;
+        background: black;
+        color: #ffffdd;
+        overflow: hidden;
+    }
+
+    h1 {
+        text-shadow: 0px 0px 5px #ff8888; 
+    }
+
+    #container {
+      text-align: center;
+      margin: 0px auto;
+    }
+
+    .toprow{
+      margin-left: auto;
+      margin-right: auto;
+      width: 1000px;
+      position: relative;
+      top: 30px;
+    }
+    .bottomrow{
+      clear: both;
+      margin-left: auto;
+      margin-right: auto;
+      top: -285px;
+      position: relative;
+      width: 600px;
+    }
+    .button {
+       margin-left:  4px;
+      margin-right:  4px;
+      z-index: 3;
+   }
+    .button.left{ float:left; }
+    .button.right{ float:right; }
+    .clear{ clear: both; }
+
+    #canvas{
+      width: 750px;
+      height: 750px;
+      position: relative;
+      top: -75px;
+      z-index:   -1;  
+    }
+
+    #manual_rotate {
+      position: relative;
+      top: -400px;
+    }
+
+</style>
+</head>
+<body>
+<div id="container">
+  <div id="svgholder"></div>
+  <canvas id="canvas" width=750 height=750></canvas>   
+  <div class="bottomrow" >
+    <br>
+    <br>
+    <br>
+    <img class="button left"   id="buttonleft"  src="/static/button_left.png"      alt="Left"   ondragstart="return false" onselectstart="return false" >
+    <img class="button right"   id="buttonright" src="/static/button_right.png"    alt="Right"  ondragstart="return false" onselectstart="return false" >
+    <div class="clear"></div>
+    <br>
+  </div>
+  <div id="cube_status">Waiting for controller...</div>
+  <div id="manual_rotate" class="debug">
+    Altitude: <input id="slide_alt" type="range" min="-1000" max="1000" value="220" onchange="rotate_view();"><br/>
+    Azimuth: <input id="slide_azi" type="range" min="-1000" max="1000" value="0" onchange="rotate_view();"><br/>
+  </div>
+  <div id="frameratediv" class="debug">
+    Framerate: <span id="framerate">...</span> fps
+  </div>
+
+  <script>
+    // Display debug stuff if URL snippet is #debug
+    $(document).ready( function() {
+       if( location.hash == "#debug" ) {
+           $(".debug").css('display','block');
+       }
+    });
+
+    // Pulse the color of the header
+    function fade_to_red() {
+        $('.pulse').animate(
+          { 'color': '#f88' },
+          40000, 'linear', fade_to_yellow
+        );
+    }
+    function fade_to_yellow() {
+        $('.pulse').animate(
+          { 'color': '#ffd' },
+          40000, 'linear',fade_to_red
+        );
+    }
+    $(document).ready( function() {
+        fade_to_red();
+    });
+  </script>
+</div>
+
+<script type="text/javascript">
+// Only include GA if we're on port 80, i.e. production
+if( ! document.location.port ) {
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-16219925-1']);
+  _gaq.push(['_setDomainName', 'none']);
+  _gaq.push(['_setAllowLinker', true]);
+  _gaq.push(['_trackPageview']);
+
+  (function() {
+    var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+    ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+  })();
+}
+</script>
+</body> 
+</html>  
