@@ -84,7 +84,17 @@ _solved = { 'format': 'cross', 'repr': [
     '   yyy   ',
     '   yyy   ',
     '   yyy   ',
-] }
+], 'datagram':  # BGR triplets
+    "%02x%02x%02x" % (  0, 255,   0) * 9 + # R
+    "%02x%02x%02x" % (255,   0,   0) * 9 + # L
+    "%02x%02x%02x" % (255, 255, 255) * 9 + # F
+    "%02x%02x%02x" % (  0, 255, 255) * 9 + # B
+    "%02x%02x%02x" % (  0, 120, 255) * 9 + # D
+    "%02x%02x%02x" % (  0,   0, 255) * 9 } # U
+
+def _repr_cross(datagram):
+    # TODO(david): Produce the 'cross' representation from the RGB datagram
+    pass
 
 def next_game():
     global _next_game_id
