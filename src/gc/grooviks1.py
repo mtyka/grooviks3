@@ -17,8 +17,9 @@ import json
 import mimerender
 import re
 from string import maketrans
+from animator_client import Animator
 
-mimerender = mimerender.WebPyMimeRender() 
+mimerender = mimerender.WebPyMimeRender()
 
 RESULT = 'result'
 
@@ -162,6 +163,9 @@ class Game:
         return { RESULT: "" }
 
 class Moves:
+    def __init__(self):
+        self._animator = Animator()
+    
     """List all of the moves made in game 1.
      GET /games/1/moves
       => "R2u'blf'ur"
@@ -234,6 +238,7 @@ class Moves:
         # If any moves have been skipped, pad the missing moves.
         moves.extend(["-"] * (move_index - len(moves) - 1))
         moves[move_index - 1:len(moves)] = [self._canonical_move(m) for m in new_moves]
+        self._animator.animate(game(game_id)['moves'])
 
     def _canonical_move(self, move):
         """Convert the move its canonical representation."""
