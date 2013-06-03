@@ -238,6 +238,7 @@ class Moves:
         # If any moves have been skipped, pad the missing moves.
         moves.extend(["-"] * (move_index - len(moves) - 1))
         moves[move_index - 1:len(moves)] = [self._canonical_move(m) for m in new_moves]
+        # TODO: Do this in a separate thread.
         self._animator.animate(game(game_id)['moves'])
 
     def _canonical_move(self, move):
