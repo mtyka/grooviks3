@@ -27,6 +27,10 @@ urls = (
 app = web.application(urls, globals())
 
 class Display:
+    """Basic animator service.  For now, simply echoes request arguments to
+    stdout.
+    
+    """
     @mr
     def POST(self):
         if len(web.data()) == 0:

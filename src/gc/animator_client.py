@@ -9,6 +9,12 @@ import json
 
 
 class Animator:
+    """Basic client for animator service (animator.py).
+    
+    This client simply converts unstructured data to JSON and sends it to the
+    service.  It is hardcoded, presently, to localhost:7890.
+    
+    """
     def __init__(self):
         self._connection = httplib.HTTPConnection('localhost', 7890)
 
