@@ -7,6 +7,10 @@ of their local game.
 
 Instructions to run:
 
+  # In one window:
+  python gc/animator.py 7890
+  
+  # In a second one:  
   python gc/grooviks1.py <port>
 
 @author: David
