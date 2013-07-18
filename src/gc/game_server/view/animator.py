@@ -19,6 +19,8 @@ class Animator:
         self._connection = httplib.HTTPConnection('localhost', 7890)
 
     def animate(self, data):
-        self._connection.request("POST", "/cube/display", json.dumps(data))
+        print json.dumps(data)
+#        self._connection.request("POST", "/cube/animate", json.dumps(data))
+        self._connection.request("POST", "/cube/animate", "ff0044")
 
 
