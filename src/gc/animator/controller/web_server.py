@@ -32,12 +32,12 @@ def mr(target):
     return wrapped
 
 URLS = (
-    '/cube/animate', 'AnimateREST',
+    '/cube/animate', '_AnimateREST',
 )
 
 
 
-class AnimateREST:
+class _AnimateREST:
     @mr
     def POST(self):
         if len(web.data()) == 0:

@@ -13,7 +13,7 @@ def main():
     web_thread.daemon = True
     web_thread.start()
 
-    # Simulator _View
+    # Simulator View
     simulator.run_simulation()
 
 

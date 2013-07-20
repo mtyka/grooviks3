@@ -7,12 +7,12 @@ from spatial import *
 
 
 """
- Groovik's vcube3D has 54 colors, arranged (at the moment) in this fashion.
+ Groovik's cube has 54 colors, arranged (at the moment) in this fashion.
 
  This is a right-handed coordinate system.  
 
- _VirtualCube coordinate system: +Z points "up", +X points "east", and +Y points "north".
- _View coordinate system: +Z points toward camera, +X points "right", +y points "up".
+ Cube coordinate system: +Z points "up", +X points "east", and +Y points "north".
+ View coordinate system: +Z points toward camera, +X points "right", +Y points "up".
 
   EAST        WEST           NORTH         SOUTH         TOP         BOTTOM
   x = 1       x = -1         y = 1         y = -1        z = 1       z = -1
@@ -25,9 +25,10 @@ from spatial import *
 """
 
 
-RESOLUTION = (1000, 500)
-FPS = 30
+RESOLUTION = (1000, 500)                # window size
+FPS = 30                                # frames per second
 CAPTION = "Cube Console & Simulator"
+BORDER = 2.5                            # border size, as percent of Side size
 
 
 
@@ -62,19 +63,20 @@ class _Facet:
 
  
 class _Side:
-    def __init__(self, name, rots, trans, border=0.025):
+    def __init__(self, name, rots, trans):
         self.name = name
-        self.border = border
+
+        border = BORDER/100.0
 
         # Section the standard square polygon at z=1 into 9 facets
         self.facets = []
         for r in range(3):
-            rA = (float(r)/3 + self.border)*2
-            rB = (float(r+1)/3 - self.border)*2
+            rA = (float(r)/3 + border)*2
+            rB = (float(r+1)/3 - border)*2
             for c in range(3):
                 # create polygon at Z=1 bwtween X,Y = (-1,-1) and (1,1) 
-                cA = (float(c)/3 + self.border)*2
-                cB = (float(c+1)/3 - self.border)*2
+                cA = (float(c)/3 + border)*2
+                cB = (float(c+1)/3 - border)*2
                 polygon = Polygon([
                     Point(cA, rA, 0),
                     Point(cB, rA, 0),
@@ -110,7 +112,7 @@ class _VirtualCube:
 
 
 
-def setup_views(screen):
+def _setup_views(screen):
 
     size = min(screen.get_width()/3, screen.get_height())
     offset = size*95/100
@@ -123,7 +125,7 @@ def setup_views(screen):
     global view2
     global view3
 
-    # _View of East, South, and Top
+    # View of East, South, and Top
     view1 = _View(
         screen = screen, 
         visible_sides = ['E', 'S', 'T'],
@@ -132,7 +134,7 @@ def setup_views(screen):
         translation = Point(-offset, 0, 0)
         );
         
-    # _View of West, North, and Bottom
+    # View of West, North, and Bottom
     view2 = _View(
         screen = screen, 
         visible_sides = ['W', 'N', 'B'],
@@ -141,7 +143,7 @@ def setup_views(screen):
         translation = Point(0, 0, 0)
         );
         
-    # Flat _View
+    # Flat View
     view3 = _View(
         screen = screen, 
         visible_sides = ['E', 'S', 'T', 'W', 'N', 'B'],
@@ -182,7 +184,7 @@ def run_simulation(resolution = RESOLUTION, fps = FPS):
         _Side('B', [], Point(2,1,0)),
         ])
 
-    setup_views(screen)
+    _setup_views(screen)
 
     """ Main Loop """
     try:
@@ -194,7 +196,7 @@ def run_simulation(resolution = RESOLUTION, fps = FPS):
                     sys.exit()
                 elif event.type == pygame.VIDEORESIZE:
                     screen = pygame.display.set_mode(event.dict['size'], pygame.RESIZABLE)
-                    setup_views(screen)
+                    _setup_views(screen)
 
             clock.tick(fps)
             screen.fill((0,0,0))
