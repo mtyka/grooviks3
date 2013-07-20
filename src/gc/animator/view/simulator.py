@@ -27,6 +27,8 @@ from spatial import *
 
 RESOLUTION = (1000, 500)
 FPS = 30
+CAPTION = "Cube Console & Simulator"
+
 
 
 class _Projection:
@@ -156,7 +158,7 @@ def run_simulation(resolution = RESOLUTION, fps = FPS):
     global view3
 
     pygame.init()
-    pygame.display.set_caption("_VirtualCube Console & Simulator")
+    pygame.display.set_caption(CAPTION)
 
     screen = pygame.display.set_mode(resolution, pygame.RESIZABLE)
     
