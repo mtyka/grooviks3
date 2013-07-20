@@ -1,4 +1,4 @@
-from simulator import _Point
+from simulator import Point
 import unittest
 
 
@@ -12,8 +12,8 @@ run using:
 class TestPoint(unittest.TestCase):
 
     def test_translate_should_add(self):
-        point = _Point(0, 0, 0)
-        point.translate(_Point(1, 2, 3))
+        point = Point(0, 0, 0)
+        point.translate(Point(1, 2, 3))
         self.assertEqual(point.x, 1)
         self.assertEqual(point.y, 2)
         self.assertEqual(point.z, 3)
