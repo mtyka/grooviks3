@@ -53,9 +53,13 @@ def games():
 def game(game_id):
     return _games.setdefault(game_id, {})
 
-def add(name):
+def add(name = None):
     global _id_cur 
     _id_cur += 1
+
+    if not name:
+        name = "Game %d" % _id_cur
+        
     _games[_id_cur] = {
         'id': _id_cur, 
         'name': name,

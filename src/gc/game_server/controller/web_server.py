@@ -2,6 +2,7 @@ import web
 import json
 import mimerender
 import re
+import sys
 
 from model import games 
 from view import animator
@@ -13,10 +14,11 @@ MOVE_PATTERN = "(?:[LRUDFB]w?|[MESlrudfbxyz])[123']?"
 
 # URL routing for the server
 URLS = (
-    '/gc/games(?:/)?', '_GamesREST',
-    '/gc/games/(\d+)', '_GameREST',
-    '/gc/games/(\d+)/moves', '_MovesREST',
-    '/gc/games/(\d+)/moves/(\d+)/((?:%s)+)' % MOVE_PATTERN, '_MovesREST',
+    '/gc/quit', '_REST_Quit',
+    '/gc/games(?:/)?', '_REST_Games',
+    '/gc/games/(\d+)', '_REST_Game',
+    '/gc/games/(\d+)/moves', '_REST_Moves',
+    '/gc/games/(\d+)/moves/(\d+)/((?:%s)+)' % MOVE_PATTERN, '_REST_Moves',
 )
 
 
@@ -53,7 +55,19 @@ def mr(target):
 
 
 
-class _GamesREST:
+class _REST_Quit:
+    """Take down server:
+     POST /quit
+
+    """
+    @mr
+    def POST(self):
+        print "Cube Game Server shutting down..."
+        sys.exit()
+
+
+
+class _REST_Games:
     """Show all my games:
      GET /games
 
@@ -68,19 +82,13 @@ class _GamesREST:
     @mr
     def POST(self):
         req = web.input()
-
-        if ('name' in req):
-            name = req['name']
-        else:
-            name = "Game %d" % new_game['id']
-
+        name = req.get('name', None)
         game_id = games.add(name)
-
         return { RESULT: game_id }
 
 
 
-class _GameREST:
+class _REST_Game:
     """Print the details of game 1:
      GET /games/1
       => { state: (ACTIVE|WAITING), hash: 0x140de050, cube: { format: cross, repr: [[...]] } }
@@ -116,7 +124,7 @@ class _GameREST:
 
 
 
-class _MovesREST:
+class _REST_Moves:
     def __init__(self):
         self._animator = animator.Animator()
     
@@ -187,7 +195,7 @@ class _MovesREST:
 #
 # GET /admin
 #
-class _AdminREST:
+class _REST_Admin:
     # TODO
     pass
 
@@ -200,7 +208,7 @@ class _AdminREST:
 # GET /cubes
 # POST /cubes { physical cube self-registration }
 #
-class _CubesREST:
+class _REST_Cubes:
     # TODO
     pass
 
