@@ -1,6 +1,6 @@
 import sys
 import math
-import pygame
+from Tkinter import *
 
 from model import cube
 from spatial import *
@@ -25,10 +25,33 @@ from spatial import *
 """
 
 
-RESOLUTION = (1000, 500)                # window size
-FPS = 30                                # frames per second
+WINDOW_SIZE = 1000, 500
 CAPTION = "Cube Console & Simulator"
-BORDER = 2.5                            # border size, as percent of Side size
+
+# border size, as percent of Side size
+BORDER = 2.5            
+
+
+
+
+
+
+
+# TkInter wrapper functions
+def _geometry(size):
+    return "%dx%d" % (size[0], size[1])
+
+def _color(color):
+    return "#%02x%02x%02x" % (color[0], color[1], color[2])
+
+def _render_polygon(view, color, points):
+    canvas = view.frame.canvas
+    canvas.create_polygon(points, fill=_color(color))
+    canvas.pack(fill=BOTH, expand=1)
+
+
+
+
 
 
 
@@ -41,8 +64,8 @@ class _Projection:
 
 
 class _View:
-    def __init__(self, screen, visible_sides, projection, rots=[], translation=Point(0,0,0)):
-        self.screen = screen
+    def __init__(self, frame, visible_sides, projection, rots=[], translation=Point(0,0,0)):
+        self.frame = frame
         self.visible_sides = visible_sides
         self.projection = projection
         self.rots = rots
@@ -59,7 +82,7 @@ class _Facet:
     def draw(self, view):
         with cube.cube_lock:
             color = cube.cube.facet_color(self.side, self.r, self.c)
-        self.polygon.draw(pygame.draw.polygon, view, color)
+        self.polygon.draw(_render_polygon, view, color)
 
  
 class _Side:
@@ -112,105 +135,119 @@ class _VirtualCube:
 
 
 
-def _setup_views(screen):
 
-    size = min(screen.get_width()/3, screen.get_height())
-    offset = size*95/100
-    fov = size * 2
 
-    projection3D = _Projection('3D', screen.get_size(), fov, 8)
-    projectionFlat = _Projection('flat', screen.get_size(), fov, 16)
+class Simulator(Frame):
+  
+    def __init__(self, parent, window_size):
+        Frame.__init__(self, parent)   
 
-    global view1
-    global view2
-    global view3
+        self.parent = parent
 
-    # View of East, South, and Top
-    view1 = _View(
-        screen = screen, 
-        visible_sides = ['E', 'S', 'T'],
-        projection = projection3D, 
-        rots = [Rot('Z', -60), Rot('X', -70)], 
-        translation = Point(-offset, 0, 0)
-        );
+        self.canvas = Canvas(self)
+        self.canvas.configure(background='black')
         
-    # View of West, North, and Bottom
-    view2 = _View(
-        screen = screen, 
-        visible_sides = ['W', 'N', 'B'],
-        projection = projection3D, 
-        rots = [Rot('Z', 120), Rot('X', -105)], 
-        translation = Point(0, 0, 0)
-        );
-        
-    # Flat View
-    view3 = _View(
-        screen = screen, 
-        visible_sides = ['E', 'S', 'T', 'W', 'N', 'B'],
-        projection = projectionFlat,
-        rots = [],
-        translation = Point(offset, 0, 0)
-        );
+        self._setup_cubes()
+        self._setup_views(window_size)
+        self.draw()
 
 
+    def resize(self, event):
+        window_size = event.width, event.height
+        self._setup_views(window_size)
+        self.draw()
 
-def run_simulation(resolution = RESOLUTION, fps = FPS):
-    global view1
-    global view2
-    global view3
 
-    pygame.init()
-    pygame.display.set_caption(CAPTION)
+    def _setup_cubes(self):
+        self.vcube3D = _VirtualCube([
+            _Side('E', [Rot('Y', 90)], Point(0,0,0)),
+            _Side('W', [Rot('Y', -90)], Point(0,0,0)),
+            _Side('N', [Rot('X', -90)], Point(0,0,0)),
+            _Side('S', [Rot('X', 90)], Point(0,0,0)),
+            _Side('T', [], Point(0,0,0)),
+            _Side('B', [Rot('Y', 180)], Point(0,0,0)),
+            ])
 
-    screen = pygame.display.set_mode(resolution, pygame.RESIZABLE)
-    
-    clock = pygame.time.Clock()
+        self.vcubeFlat = _VirtualCube([
+            _Side('E', [], Point(0,3,0)),
+            _Side('W', [], Point(0,-1,0)),
+            _Side('N', [], Point(0,1,0)),
+            _Side('S', [], Point(0,-3,0)),
+            _Side('T', [], Point(-2,1,0)),
+            _Side('B', [], Point(2,1,0)),
+            ])
 
-    vcube3D = _VirtualCube([
-        _Side('E', [Rot('Y', 90)], Point(0,0,0)),
-        _Side('W', [Rot('Y', -90)], Point(0,0,0)),
-        _Side('N', [Rot('X', -90)], Point(0,0,0)),
-        _Side('S', [Rot('X', 90)], Point(0,0,0)),
-        _Side('T', [], Point(0,0,0)),
-        _Side('B', [Rot('Y', 180)], Point(0,0,0)),
-        ])
 
-    vcubeFlat = _VirtualCube([
-        _Side('E', [], Point(0,3,0)),
-        _Side('W', [], Point(0,-1,0)),
-        _Side('N', [], Point(0,1,0)),
-        _Side('S', [], Point(0,-3,0)),
-        _Side('T', [], Point(-2,1,0)),
-        _Side('B', [], Point(2,1,0)),
-        ])
+    def _setup_views(self, window_size):
 
-    _setup_views(screen)
+        width = window_size[0]
+        height = window_size[1]
 
-    """ Main Loop """
-    try:
-        while 1:
+        size = min(width/3, height)
+        offset = size*95/100
+        fov = size * 2
 
-            for event in pygame.event.get():
-                if (event.type == pygame.QUIT) or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
-                    pygame.quit()
-                    sys.exit()
-                elif event.type == pygame.VIDEORESIZE:
-                    screen = pygame.display.set_mode(event.dict['size'], pygame.RESIZABLE)
-                    _setup_views(screen)
+        projection3D = _Projection('3D', window_size, fov, 8)
+        projectionFlat = _Projection('flat', window_size, fov, 16)
 
-            clock.tick(fps)
-            screen.fill((0,0,0))
+        global view1
+        global view2
+        global view3
 
-            vcube3D.draw(view1)
-            vcube3D.draw(view2)
-            vcubeFlat.draw(view3)
+        # View of East, South, and Top
+        view1 = _View(
+            frame = self, 
+            visible_sides = ['E', 'S', 'T'],
+            projection = projection3D, 
+            rots = [Rot('Z', -60), Rot('X', -70)], 
+            translation = Point(-offset, 0, 0)
+            );
             
-            pygame.display.flip()
+        # View of West, North, and Bottom
+        view2 = _View(
+            frame = self, 
+            visible_sides = ['W', 'N', 'B'],
+            projection = projection3D, 
+            rots = [Rot('Z', 120), Rot('X', -105)], 
+            translation = Point(0, 0, 0)
+            );
+            
+        # Flat View
+        view3 = _View(
+            frame = self, 
+            visible_sides = ['E', 'S', 'T', 'W', 'N', 'B'],
+            projection = projectionFlat,
+            rots = [],
+            translation = Point(offset, 0, 0)
+            );
 
-    # Let control-C from the console quietly stop us
-    except (KeyboardInterrupt, SystemExit):
-        sys.exit()
+            
+    def draw(self):
+        self.canvas.delete(ALL)
+
+        self.vcube3D.draw(view1)
+        self.vcube3D.draw(view2)
+        self.vcubeFlat.draw(view3)
+        
+        self.pack(fill=BOTH, expand=1)
 
 
+
+
+def run_simulation(window_size = WINDOW_SIZE):
+    global view1
+    global view2
+    global view3
+
+    tk = Tk()
+    tk.geometry(_geometry(window_size))
+    tk.title(CAPTION)        
+
+    simulator = Simulator(tk, window_size)
+
+    tk.bind('<Escape>', lambda event: sys.exit())
+    tk.bind("<Configure>", lambda event: simulator.resize(event))
+    
+    tk.mainloop()  
 
 

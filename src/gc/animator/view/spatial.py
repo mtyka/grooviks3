@@ -92,6 +92,6 @@ class Polygon:
         for point in polygon.points:
             poly2d.append((point.x, point.y))
 
-        fn(view.screen, color, poly2d, 0)
+        fn(view, color, poly2d)
 
 
