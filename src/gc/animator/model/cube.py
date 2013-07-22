@@ -1,4 +1,5 @@
 import threading
+import Queue
 
 
 FACE_NUM = {
@@ -48,4 +49,7 @@ cube = Cube([
     (0x00,0xff,0x00),(0xff,0x7f,0x00),(0xff,0xff,0x00),
     ])
 
+
+# queue for sending commands to the simulator
+simulator_queue = Queue.Queue()
 

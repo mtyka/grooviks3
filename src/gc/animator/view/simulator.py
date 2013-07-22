@@ -1,5 +1,6 @@
 import sys
 import math
+import Queue
 from Tkinter import *
 
 from model import cube
@@ -27,7 +28,7 @@ from spatial import *
 
 WINDOW_SIZE = 1000, 500
 CAPTION = "Cube Console & Simulator"
-FPS = 30
+FPS = 3
 
 # border size, as percent of Side size
 BORDER = 2.5            
@@ -150,7 +151,9 @@ class Simulator(Frame):
         
         self._setup_cubes()
         self._setup_views(window_size)
-        self.draw()
+
+        self._draw()
+        self.run()
 
     def resize(self, event):
         window_size = event.width, event.height
@@ -220,9 +223,8 @@ class Simulator(Frame):
             rots = [],
             translation = Point(offset, 0, 0)
             );
-
             
-    def draw(self):
+    def _draw(self):
         self.canvas.delete(ALL)
 
         self.vcube3D.draw(view1)
@@ -231,8 +233,19 @@ class Simulator(Frame):
         
         self.pack(fill=BOTH, expand=1)
 
-        # draw again ...
-        self.canvas.after(int(1000.0/FPS), self.draw)
+    def run(self):
+        # look for command on queue
+        try:
+            command = cube.simulator_queue.get(False)
+            if (command == 'QUIT'):
+                sys.exit()
+            elif (command == 'DRAW'):
+                self._draw()
+        except Queue.Empty:
+            pass
+
+        # try again after drawing & waiting
+        self.canvas.after(int(1000.0/FPS), self.run)
 
 
 

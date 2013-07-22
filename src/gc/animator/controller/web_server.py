@@ -3,6 +3,7 @@ import json
 import mimerender
 import re
 import threading
+import Queue
 import sys
 
 import action
@@ -47,7 +48,8 @@ class _REST_Quit:
     """
     @mr
     def POST(self):
-        pass
+        cube.simulator_queue.put('QUIT')
+
         return {}
         #print "Cube Animation Server shutting down..."
         # doesn't work yet.  Don't use sys.exit().  Must coordinate this better.
@@ -58,6 +60,7 @@ class _REST_Quit:
 class _REST_Enqueue:
     @mr
     def POST(self):
+
         if len(web.data()) == 0:
             raise Exception('No data')
 
@@ -67,6 +70,8 @@ class _REST_Enqueue:
         #action.enqueue(color)
         action.set_cube_color_temp(color)
 
+        cube.simulator_queue.put('DRAW')
+        
         return {}
 
 
