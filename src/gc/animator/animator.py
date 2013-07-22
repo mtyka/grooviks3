@@ -2,16 +2,17 @@ import threading
 from model import cube
 from view import simulator
 from controller import web_server
+#from controller import action
 
 
 
 
 def main():
+    # Action command queue
+#    action.start()
+    
     # Web Server
-    web_thread = web_server.WebThread()
-    # This allows the web server thread to automatically quit if the program exits
-    web_thread.daemon = True
-    web_thread.start()
+    web_server.start()
 
     # Simulator View
     simulator.run_simulation()

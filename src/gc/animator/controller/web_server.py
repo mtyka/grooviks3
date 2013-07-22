@@ -3,6 +3,7 @@ import json
 import mimerender
 import re
 import threading
+import sys
 
 from model import cube
 
@@ -32,12 +33,25 @@ def mr(target):
     return wrapped
 
 URLS = (
-    '/cube/animate', '_AnimateREST',
+    '/animator/quit', '_REST_Quit',
+    '/animator/enqueue', '_REST_Enqueue',
 )
 
 
 
-class _AnimateREST:
+class _REST_Quit:
+    """Take down server:
+     POST /quit
+
+    """
+    @mr
+    def POST(self):
+        print "Cube Animation Server shutting down..."
+        sys.exit()
+
+
+
+class _REST_Enqueue:
     @mr
     def POST(self):
         if len(web.data()) == 0:
@@ -46,20 +60,27 @@ class _AnimateREST:
         req = web.data()
         color = _color_from_hex(req)
 
-        with cube.cube_lock:
-            for i in range(54):
-                cube.cube.colors[i] = color
-            color = cube.cube.colors[0]
-        
+        action.enqueue(color)
+
         return {}
 
 
 
 
 
-class WebThread(threading.Thread):
+class _WebThread(threading.Thread):
     def run(self):
         app = web.application(URLS, globals())
         app.run()
       
+
+
+
+def start():
+    web_thread = _WebThread()
+    # This allows the web server thread to automatically quit if the program exits
+    web_thread.daemon = True
+    web_thread.start()
+
+
 
