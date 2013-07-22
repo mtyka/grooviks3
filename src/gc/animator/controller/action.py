@@ -15,6 +15,8 @@ def _color_cube(color):
             cube.cube.colors[i] = color
         color = cube.cube.colors[0]
 
+def set_cube_color_temp(color):
+    _color_cube(color)
 
 
 
@@ -74,6 +76,6 @@ def start():
 
 
 
-start()
+#start()
 
 

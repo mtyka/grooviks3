@@ -20,7 +20,7 @@ class Animator:
 
     def animate(self, data):
         print json.dumps(data)
-#        self._connection.request("POST", "/animator/animate", json.dumps(data))
-        self._connection.request("POST", "/animator/animate", "ff0044")
+#        self._connection.request("POST", "/animator/enqueue", json.dumps(data))
+        self._connection.request("POST", "/animator/enqueue", "ff0044")
 
 

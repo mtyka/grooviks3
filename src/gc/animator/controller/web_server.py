@@ -5,6 +5,7 @@ import re
 import threading
 import sys
 
+import action
 from model import cube
 
 
@@ -46,8 +47,11 @@ class _REST_Quit:
     """
     @mr
     def POST(self):
-        print "Cube Animation Server shutting down..."
-        sys.exit()
+        pass
+        return {}
+        #print "Cube Animation Server shutting down..."
+        # doesn't work yet.  Don't use sys.exit().  Must coordinate this better.
+        #sys.exit()
 
 
 
@@ -60,7 +64,8 @@ class _REST_Enqueue:
         req = web.data()
         color = _color_from_hex(req)
 
-        action.enqueue(color)
+        #action.enqueue(color)
+        action.set_cube_color_temp(color)
 
         return {}
 
