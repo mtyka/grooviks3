@@ -27,6 +27,7 @@ from spatial import *
 
 WINDOW_SIZE = 1000, 500
 CAPTION = "Cube Console & Simulator"
+FPS = 30
 
 # border size, as percent of Side size
 BORDER = 2.5            
@@ -151,11 +152,10 @@ class Simulator(Frame):
         self._setup_views(window_size)
         self.draw()
 
-
     def resize(self, event):
         window_size = event.width, event.height
         self._setup_views(window_size)
-        self.draw()
+        #self.draw()
 
 
     def _setup_cubes(self):
@@ -230,6 +230,9 @@ class Simulator(Frame):
         self.vcubeFlat.draw(view3)
         
         self.pack(fill=BOTH, expand=1)
+
+        # draw again ...
+        self.canvas.after(int(1000.0/FPS), self.draw)
 
 
 
