@@ -8,7 +8,7 @@ import sys
 
 import action
 from model import cube
-
+from controller import action
 
 
 
@@ -48,30 +48,20 @@ class _REST_Quit:
     """
     @mr
     def POST(self):
-        cube.simulator_queue.put('QUIT')
-
+        action.quit()
         return {}
-        #print "Cube Animation Server shutting down..."
-        # doesn't work yet.  Don't use sys.exit().  Must coordinate this better.
-        #sys.exit()
 
 
 
 class _REST_Enqueue:
     @mr
     def POST(self):
-
         if len(web.data()) == 0:
             raise Exception('No data')
 
         req = web.data()
         color = _color_from_hex(req)
-
-        #action.enqueue(color)
-        action.set_cube_color_temp(color)
-
-        cube.simulator_queue.put('DRAW')
-        
+        action.add(color)
         return {}
 
 

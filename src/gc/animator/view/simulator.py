@@ -35,6 +35,7 @@ BORDER = 2.5
 
 
 
+queue = Queue.Queue()
 
 
 
@@ -236,7 +237,7 @@ class Simulator(Frame):
     def run(self):
         # look for command on queue
         try:
-            command = cube.simulator_queue.get(False)
+            command = queue.get(False)
             if (command == 'QUIT'):
                 sys.exit()
             elif (command == 'DRAW'):

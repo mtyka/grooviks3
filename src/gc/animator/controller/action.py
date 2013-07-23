@@ -1,11 +1,15 @@
+import sys
 import threading
 import Queue
 
 from model import cube
+from view import simulator
 
 
 
 
+
+queue = Queue.Queue()
 
 
 
@@ -15,46 +19,38 @@ def _color_cube(color):
             cube.cube.colors[i] = color
         color = cube.cube.colors[0]
 
-def set_cube_color_temp(color):
-    _color_cube(color)
-
-
-
 
 
 
 class _ActionThread(threading.Thread):
-    def __init__(self):
-        global animation_queue
-        animation_queue = Queue.Queue(maxsize=0)
-        threading.Thread.__init__(self)
-
     def run(self):
-        while 1:
-            global animation_queue
-            item = animation_queue.get()
-            if item is None:
-                break # reached end of animation_queue
-            _color_cube(item)
-        print "done"
+        while True:
+            try:
+                # wait for command from queue
+                item = queue.get(True)
+                command = item['command']
 
+                if (command == 'QUIT'):
+                    simulator.queue.put('QUIT')
 
+                elif (command == 'COLOR'):
+                    _color_cube(item['color'])
+                    simulator.queue.put('DRAW')
 
-
-
-
+            except Queue.Empty:
+                pass
 
 
 
 
 def add(color):
-    global animation_queue
-    animation_queue.put(color)
+    global queue
+    queue.put({'command': 'COLOR', 'color': color})
         
 
 def quit():
-    global animation_queue
-    animation_queue.put(None)
+    global queue
+    queue.put({'command': 'QUIT'})
         
 
 def start():
@@ -62,20 +58,6 @@ def start():
     # This allows the web server thread to automatically quit if the program exits
     action_thread.daemon = True
     action_thread.start()
-    print "running"
-    time.sleep(1)
-    print "add"
-    print add('my color')
-    time.sleep(1)
-    print "quit"
-    quit()
 
-
-
-
-
-
-
-#start()
 
 
