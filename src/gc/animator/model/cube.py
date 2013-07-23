@@ -50,11 +50,3 @@ cube = Cube([
     ])
 
 
-# Perhaps these should go elsewhere...
-
-# queue for cube-animating actions received by web_server
-action_queue = Queue.Queue()
-
-# queue for sending commands to the simulator
-#simulator_queue = Queue.Queue()
-
