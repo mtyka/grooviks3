@@ -1,7 +1,7 @@
 '''
 Created on Jun 2, 2013
 
-@author: David
+@author: David, Geoff
 '''
 
 import httplib
@@ -17,6 +17,7 @@ class Animator:
     """
     def __init__(self):
         self._connection = httplib.HTTPConnection('localhost', 7890)
+
     def animate(self, data):
         # TODO(geoff): animate wants cube state (colors), not moves
 #        self._connection.request("POST", "/animator/actions", json.dumps(data))
@@ -32,7 +33,6 @@ class Animator:
             }
 
         self._connection.request("POST", "/animator/actions", "ff0044")
-
 
     def quit(self):
         self._connection.request("DELETE", "/animator")
