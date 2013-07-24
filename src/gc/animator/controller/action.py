@@ -44,12 +44,10 @@ class _ActionThread(threading.Thread):
 
 
 def add(color):
-    global queue
     queue.put({'command': 'COLOR', 'color': color})
         
 
 def quit():
-    global queue
     queue.put({'command': 'QUIT'})
         
 
