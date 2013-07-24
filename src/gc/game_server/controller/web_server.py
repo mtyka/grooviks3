@@ -57,7 +57,6 @@ class _REST:
      DELETE /gc
 
     """
-    @mr
     def DELETE(self):
         print "Cube Game Server shutting down..."
         animator.quit()
@@ -175,7 +174,7 @@ class _REST_Moves:
     def GET(self, game_id):
         game_id = int(game_id)
         print games.game(game_id)
-        return { RESULT: games.game(game_id) }
+        return games.game(game_id)
 
     @mr
     def PUT(self, game_id, move_index, new_moves):
@@ -185,7 +184,9 @@ class _REST_Moves:
         new_moves = re.findall(MOVE_PATTERN, new_moves)
         games.record_moves(game_id, move_index, new_moves)
         animator.animate(games.game(game_id)['moves'])
-        return { RESULT: [] }
+        return { RESULT: "" }
+
+
 
 
 
