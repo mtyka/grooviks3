@@ -22,15 +22,15 @@ class Animator:
         # TODO(geoff): animate wants cube state (colors), not moves
 #        self._connection.request("POST", "/animator/actions", json.dumps(data))
 
-        message = {
-            'datagram':
-                9 * _COLOR_GREEN +  # R
-                9 * _COLOR_BLUE +   # L
-                9 * _COLOR_WHITE +  # F
-                9 * _COLOR_YELLOW + # B
-                9 * _COLOR_ORANGE + # D
-                9 * _COLOR_RED      # U
-            }
+#        message = {
+#            'datagram':
+#                9 * _COLOR_GREEN +  # R
+#                9 * _COLOR_BLUE +   # L
+#                9 * _COLOR_WHITE +  # F
+#                9 * _COLOR_YELLOW + # B
+#                9 * _COLOR_ORANGE + # D
+#                9 * _COLOR_RED      # U
+#            }
 
         self._connection.request("POST", "/animator/actions", "ff0044")
 
