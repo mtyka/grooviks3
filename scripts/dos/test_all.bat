@@ -4,7 +4,7 @@ REM	A breadth test for the Grooviks Cube, including game_server and animator
 REM
 
 REM Start servers
-call .\start.bat
+call start_cube.bat
 
 REM Breadth test
 @echo on
