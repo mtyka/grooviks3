@@ -19,7 +19,8 @@ class Animator:
         self._connection = httplib.HTTPConnection('localhost', 7890)
 
     def animate(self, data):
-        print json.dumps(data)
+        print "animate data:", data
+        print "animate data (json.dumps):", json.dumps(data)
 #        self._connection.request("POST", "/animator/enqueue", json.dumps(data))
         self._connection.request("POST", "/animator/enqueue", "ff0044")
 

@@ -4,8 +4,7 @@ REM	A breadth test for the Grooviks Cube, including game_server and animator
 REM
 
 REM Start servers
-start cmd /T:1F /k "..\..\src\gc\game_server\game_server.py 11111 && sleep 5 && exit"
-start cmd /T:4F /k "..\..\src\gc\animator\animator.py 7890 && sleep 5 && exit"
+call .\start.bat
 
 REM Breadth test
 @echo on
