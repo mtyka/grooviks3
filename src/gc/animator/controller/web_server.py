@@ -35,25 +35,29 @@ def mr(target):
     return wrapped
 
 URLS = (
-    '/animator/quit', '_REST_Quit',
-    '/animator/enqueue', '_REST_Enqueue',
+    '/animator', '_REST',
+    '/animator/actions', '_REST_Actions',
 )
 
 
 
-class _REST_Quit:
-    """Take down server:
-     POST /quit
+class _REST:
+    """ Take down server:
+     DELETE /animator
 
     """
     @mr
-    def POST(self):
+    def DELETE(self):
         action.quit()
         return {}
 
 
 
-class _REST_Enqueue:
+class _REST_Actions:
+    """ Queue up an animator action command
+     POST /animator/actions
+
+    """
     @mr
     def POST(self):
         if len(web.data()) == 0:

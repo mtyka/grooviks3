@@ -14,7 +14,7 @@ MOVE_PATTERN = "(?:[LRUDFB]w?|[MESlrudfbxyz])[123']?"
 
 # URL routing for the server
 URLS = (
-    '/gc/quit', '_REST_Quit',
+    '/gc', '_REST',
     '/gc/games(?:/)?', '_REST_Games',
     '/gc/games/(\d+)', '_REST_Game',
     '/gc/games/(\d+)/moves', '_REST_Moves',
@@ -25,10 +25,7 @@ URLS = (
 
 
 
-
-
-
-
+animator = animator.Animator()
 
 mimerender = mimerender.WebPyMimeRender()
 
@@ -55,24 +52,25 @@ def mr(target):
 
 
 
-class _REST_Quit:
+class _REST:
     """Take down server:
-     POST /quit
+     DELETE /gc
 
     """
     @mr
-    def POST(self):
+    def DELETE(self):
         print "Cube Game Server shutting down..."
+        animator.quit()
         sys.exit()
 
 
 
 class _REST_Games:
     """Show all my games:
-     GET /games
+     GET /gc/games
 
     Create a new game (optionally, with the given name):
-     POST /games ?name=<name>
+     POST /gc/games ?name=<name>
 
     """
     @mr
@@ -90,14 +88,14 @@ class _REST_Games:
 
 class _REST_Game:
     """Print the details of game 1:
-     GET /games/1
+     GET /gc/games/1
       => { state: (ACTIVE|WAITING), hash: 0x140de050, cube: { format: cross, repr: [[...]] } }
 
     Update the state of game 1:
-     PUT /games/1 { cube: { format: cross, repr: [[...]] } }
+     PUT /gc/games/1 { cube: { format: cross, repr: [[...]] } }
 
     Delete game 1:
-     DELETE /games/1
+     DELETE /gc/games/1
 
     """
     @mr
@@ -125,20 +123,18 @@ class _REST_Game:
 
 
 class _REST_Moves:
-    def __init__(self):
-        self._animator = animator.Animator()
     
     """List all of the moves made in game 1.
-     GET /games/1/moves
+     GET /gc/games/1/moves
       => "R2u'blf'ur"
 
     Register move 34 in game 1:  turn the Right face 3 turns clockwise.
-     PUT /games/1/moves/34/R3
-     PUT /games/1/moves?new=R3&pos=34
+     PUT /gc/games/1/moves/34/R3
+     PUT /gc/games/1/moves?new=R3&pos=34
 
     Register three moves (which need not all be new), starting at move 34:
-     PUT /games/1/moves/34/UL2x
-     PUT /games/1/moves?new=UL2x&pos=34
+     PUT /gc/games/1/moves/34/UL2x
+     PUT /gc/games/1/moves?new=UL2x&pos=34
 
     Move notation grammar:
      move:
@@ -178,7 +174,8 @@ class _REST_Moves:
     )
     def GET(self, game_id):
         game_id = int(game_id)
-        return games.game(game_id)
+        print games.game(game_id)
+        return { RESULT: games.game(game_id) }
 
     @mr
     def PUT(self, game_id, move_index, new_moves):
@@ -187,8 +184,8 @@ class _REST_Moves:
         new_moves = new_moves.encode("ascii", "strict")
         new_moves = re.findall(MOVE_PATTERN, new_moves)
         games.record_moves(game_id, move_index, new_moves)
-        self._animator.animate(games.game(game_id)['moves'])
-        return { RESULT: "" }
+        animator.animate(games.game(game_id)['moves'])
+        return { RESULT: [] }
 
 
 

@@ -14,8 +14,6 @@ cube 11111 get gc/games
 cube 11111 get gc/games/1
 cube 11111 put gc/games/1/moves/34/R3
 cube 11111 get gc/games/1/moves
-cube 11111 post gc/quit
+cube 11111 delete gc
 
-sleep 2
-curl -s -X POST http://localhost:7890/animator/quit
 

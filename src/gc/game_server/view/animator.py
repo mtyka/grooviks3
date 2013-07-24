@@ -17,11 +17,25 @@ class Animator:
     """
     def __init__(self):
         self._connection = httplib.HTTPConnection('localhost', 7890)
-
     def animate(self, data):
-        print "animate data:", data
-        print "animate data (json.dumps):", json.dumps(data)
-#        self._connection.request("POST", "/animator/enqueue", json.dumps(data))
-        self._connection.request("POST", "/animator/enqueue", "ff0044")
+        # TODO(geoff): animate wants cube state (colors), not moves
+#        self._connection.request("POST", "/animator/actions", json.dumps(data))
+
+        message = {
+            'datagram':
+                9 * _COLOR_GREEN +  # R
+                9 * _COLOR_BLUE +   # L
+                9 * _COLOR_WHITE +  # F
+                9 * _COLOR_YELLOW + # B
+                9 * _COLOR_ORANGE + # D
+                9 * _COLOR_RED      # U
+            }
+
+        self._connection.request("POST", "/animator/actions", "ff0044")
 
 
+    def quit(self):
+        self._connection.request("DELETE", "/animator")
+
+
+    
