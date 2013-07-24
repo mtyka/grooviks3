@@ -33,9 +33,13 @@ class Animator:
 #            }
 
         self._connection.request("POST", "/animator/actions", "ff0044")
+        response = self._connection.getresponse()
+        data = response.read()
 
     def quit(self):
         self._connection.request("DELETE", "/animator")
+        response = self._connection.getresponse()
+        data = response.read()
 
 
     
