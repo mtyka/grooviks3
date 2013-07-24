@@ -2,6 +2,16 @@ import re
 from string import maketrans
 
 
+
+# Cube colors, defined as RGB hex strings
+_COLOR_WHITE    = "FFFFFF"
+_COLOR_RED      = "FF0000"
+_COLOR_ORANGE   = "FF7800"
+_COLOR_YELLOW   = "FFFF00"
+_COLOR_GREEN    = "00FF00"
+_COLOR_BLUE     = "0000FF"
+
+
 # Wacky custom representation of cube.  This view show the cube as if it were
 # unfolded into the shape of a cross, with the literal colors of the facets
 # recorded at each location.  The 3x3 square at the center of the cross is the
@@ -26,13 +36,13 @@ _solved = {
         '   yyy   ',
         '   yyy   ',
         ], 
-    'datagram':  # BGR triplets
-        "%02x%02x%02x" % (  0, 255,   0) * 9 + # R
-        "%02x%02x%02x" % (255,   0,   0) * 9 + # L
-        "%02x%02x%02x" % (255, 255, 255) * 9 + # F
-        "%02x%02x%02x" % (  0, 255, 255) * 9 + # B
-        "%02x%02x%02x" % (  0, 120, 255) * 9 + # D
-        "%02x%02x%02x" % (  0,   0, 255) * 9 # U
+    'datagram':
+        9 * _COLOR_GREEN +  # R
+        9 * _COLOR_BLUE +   # L
+        9 * _COLOR_WHITE +  # F
+        9 * _COLOR_YELLOW + # B
+        9 * _COLOR_ORANGE + # D
+        9 * _COLOR_RED      # U
     }
 
 def _repr_cross(datagram):
